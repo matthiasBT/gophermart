@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matthiasBT/gophermart/internal/infra/config"
 	"github.com/matthiasBT/gophermart/internal/server/entities"
 )
 
@@ -33,8 +34,8 @@ func authorize(w http.ResponseWriter, session *entities.Session) {
 		Name:     "session_token",
 		Value:    session.Token,
 		Path:     "/",
-		Expires:  time.Now().Add(120 * time.Second), // TODO: check expiration on server
-		HttpOnly: true,                              // Protect against XSS attacks
-		Secure:   false,                             // Should be true in production to send only over HTTPS
+		Expires:  time.Now().Add(config.SessionTTL),
+		HttpOnly: true,  // Protect against XSS attacks
+		Secure:   false, // Should be true in production to send only over HTTPS
 	})
 }
