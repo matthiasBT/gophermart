@@ -1,6 +1,6 @@
 module github.com/matthiasBT/gophermart
 
-go 1.21.3
+go 1.21
 
 require (
 	github.com/caarlos0/env/v9 v9.0.0
