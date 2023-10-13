@@ -1,8 +1,6 @@
 package usecases
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"net/http"
 	"time"
@@ -15,7 +13,8 @@ func (c *BaseController) register(w http.ResponseWriter, r *http.Request) {
 	if userReq == nil {
 		return
 	}
-	_, err := c.Stor.CreateUser(r.Context(), userReq)
+	token := generateSessionToken()
+	_, session, err := c.Stor.CreateUser(r.Context(), userReq, token)
 	if err != nil {
 		if errors.Is(err, entities.ErrLoginAlreadyTaken) {
 			w.WriteHeader(http.StatusConflict)
@@ -26,26 +25,17 @@ func (c *BaseController) register(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	authorize(w)
+	authorize(w, session)
 	return
 }
 
-func generateSessionToken() string {
-	b := make([]byte, 32)
-	_, err := rand.Read(b)
-	if err != nil {
-		panic(err)
-	}
-	return base64.StdEncoding.EncodeToString(b)
-}
-
-func authorize(w http.ResponseWriter) {
+func authorize(w http.ResponseWriter, session *entities.Session) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
-		Value:    generateSessionToken(),
+		Value:    session.Token,
 		Path:     "/",
-		Expires:  time.Now().Add(120 * time.Second),
-		HttpOnly: true,  // Protect against XSS attacks
-		Secure:   false, // Should be true in production to send only over HTTPS
+		Expires:  time.Now().Add(120 * time.Second), // TODO: check expiration on server
+		HttpOnly: true,                              // Protect against XSS attacks
+		Secure:   false,                             // Should be true in production to send only over HTTPS
 	})
 }

@@ -10,3 +10,9 @@ type User struct {
 	Login        string `db:"login"`
 	PasswordHash string `db:"password_hash"`
 }
+
+type Session struct {
+	ID     int    `db:"id"`
+	UserID int    `db:"user_id"`
+	Token  string `db:"token"`
+}
