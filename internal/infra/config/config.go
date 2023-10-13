@@ -11,7 +11,7 @@ const SessionTTL = 2 * time.Minute
 
 type Config struct {
 	ServerAddr  string `env:"RUN_ADDRESS"`
-	DatabaseDSN string `env:"DATABASE_DSN"`
+	DatabaseDSN string `env:"DATABASE_URI"`
 	AccrualAddr string `env:"ACCRUAL_SYSTEM_ADDRESS"`
 }
 
