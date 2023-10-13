@@ -25,7 +25,6 @@ func Read() (*Config, error) {
 	flagDBDSN := flag.String("d", "", "PostgreSQL database DSN")
 	flagAccrualAddr := flag.String("r", "", "Accrual system URL")
 	flag.Parse()
-	// TODO: add checks for empty values right before the return
 	if conf.ServerAddr == "" {
 		conf.ServerAddr = *flagServerAddr
 	}
@@ -34,6 +33,9 @@ func Read() (*Config, error) {
 	}
 	if conf.AccrualAddr == "" {
 		conf.AccrualAddr = *flagAccrualAddr
+	}
+	if conf.ServerAddr == "" || conf.DatabaseDSN == "" || conf.AccrualAddr == "" {
+		panic("Invalid server configuration")
 	}
 	return conf, nil
 }
