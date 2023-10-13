@@ -8,8 +8,8 @@ import (
 	"github.com/matthiasBT/gophermart/internal/server/entities"
 )
 
-const MinLoginLength = 6
-const MinPasswordLength = 6
+const MinLoginLength = 1
+const MinPasswordLength = 1
 
 func validateUser(w http.ResponseWriter, r *http.Request) *entities.UserAuthRequest {
 	if r.Header.Get("Content-Type") != "application/json" {
