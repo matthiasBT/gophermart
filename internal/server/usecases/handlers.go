@@ -14,8 +14,12 @@ func (c *BaseController) register(w http.ResponseWriter, r *http.Request) {
 	if userReq == nil {
 		return
 	}
+	pwdhash, err := c.crypto.HashPassword(userReq.Password)
+	if err != nil {
+		return
+	}
 	token := generateSessionToken()
-	_, session, err := c.Stor.CreateUser(r.Context(), userReq, token)
+	_, session, err := c.stor.CreateUser(r.Context(), userReq.Login, pwdhash, token)
 	if err != nil {
 		if errors.Is(err, entities.ErrLoginAlreadyTaken) {
 			w.WriteHeader(http.StatusConflict)
@@ -24,6 +28,37 @@ func (c *BaseController) register(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("Failed to create a new user"))
 		}
+		return
+	}
+	authorize(w, session)
+}
+
+func (c *BaseController) signIn(w http.ResponseWriter, r *http.Request) {
+	userReq := validateUser(w, r)
+	if userReq == nil {
+		return
+	}
+	user, err := c.stor.FindUser(r.Context(), userReq)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to find the user"))
+		return
+	}
+	if user == nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("User doesn't exist"))
+		return
+	}
+	if err := c.crypto.CheckPassword(userReq.Password, user.PasswordHash); err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("Incorrect password"))
+		return
+	}
+	token := generateSessionToken()
+	session, err := c.stor.CreateSession(r.Context(), nil, user, token)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to create a user session"))
 		return
 	}
 	authorize(w, session)

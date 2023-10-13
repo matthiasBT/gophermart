@@ -11,13 +11,13 @@ import (
 const MinLoginLength = 6
 const MinPasswordLength = 6
 
-func validateUser(w http.ResponseWriter, r *http.Request) *entities.UserCreateRequest {
+func validateUser(w http.ResponseWriter, r *http.Request) *entities.UserAuthRequest {
 	if r.Header.Get("Content-Type") != "application/json" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Supply data as JSON"))
 		return nil
 	}
-	var userReq entities.UserCreateRequest
+	var userReq entities.UserAuthRequest
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)

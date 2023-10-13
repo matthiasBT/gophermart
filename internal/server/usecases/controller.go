@@ -7,19 +7,22 @@ import (
 )
 
 type BaseController struct {
-	Logger logging.ILogger
-	Stor   entities.Storage
+	logger logging.ILogger
+	stor   entities.Storage
+	crypto entities.ICryptoProvider
 }
 
-func NewBaseController(logger logging.ILogger, stor entities.Storage) *BaseController {
+func NewBaseController(logger logging.ILogger, stor entities.Storage, crypto entities.ICryptoProvider) *BaseController {
 	return &BaseController{
-		Logger: logger,
-		Stor:   stor,
+		logger: logger,
+		stor:   stor,
+		crypto: crypto,
 	}
 }
 
 func (c *BaseController) Route() *chi.Mux {
 	r := chi.NewRouter()
 	r.Post("/api/user/register", c.register)
+	r.Post("/api/user/login", c.signIn)
 	return r
 }

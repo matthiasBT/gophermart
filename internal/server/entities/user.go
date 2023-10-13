@@ -2,7 +2,7 @@ package entities
 
 import "time"
 
-type UserCreateRequest struct {
+type UserAuthRequest struct {
 	Login    string
 	Password string
 }
@@ -10,7 +10,7 @@ type UserCreateRequest struct {
 type User struct {
 	ID           int    `db:"id"`
 	Login        string `db:"login"`
-	PasswordHash string `db:"password_hash"`
+	PasswordHash []byte `db:"password_hash"`
 }
 
 type Session struct {

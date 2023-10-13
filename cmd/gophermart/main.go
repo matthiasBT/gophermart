@@ -35,9 +35,9 @@ func main() {
 	)
 	db := sqlx.MustOpen("pgx", conf.DatabaseDSN)
 	defer db.Close()
+	storage := adapters.NewPGStorage(logger, db)
 	crypto := adapters.CryptoProvider{Logger: logger}
-	storage := adapters.NewPGStorage(logger, db, &crypto)
-	controller := usecases.NewBaseController(logger, storage)
+	controller := usecases.NewBaseController(logger, storage, &crypto)
 	r := setupServer(logger, controller)
 
 	srv := http.Server{Addr: conf.ServerAddr, Handler: r}

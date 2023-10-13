@@ -17,3 +17,12 @@ func (cr *CryptoProvider) HashPassword(password string) ([]byte, error) {
 	}
 	return hashedPassword, nil
 }
+
+func (cr *CryptoProvider) CheckPassword(password string, hash []byte) error {
+	if err := bcrypt.CompareHashAndPassword(hash, []byte(password)); err != nil {
+		cr.Logger.Errorf("Password hash didn't match the password: %s", err.Error())
+		return err
+	}
+	cr.Logger.Infoln("The password matched the hash")
+	return nil
+}
