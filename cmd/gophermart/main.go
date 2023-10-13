@@ -27,8 +27,12 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
-
-	logger.Debugf("Opening the database: %s\n", conf.DatabaseDSN)
+	logger.Infof(
+		"Config. Server address: %s. Database DSN: %s. Accrual system URL: %s",
+		conf.ServerAddr,
+		conf.DatabaseDSN,
+		conf.AccrualAddr,
+	)
 	db := sqlx.MustOpen("pgx", conf.DatabaseDSN)
 	defer db.Close()
 	crypto := adapters.CryptoProvider{Logger: logger}
