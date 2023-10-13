@@ -26,7 +26,6 @@ func (c *BaseController) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	authorize(w, session)
-	return
 }
 
 func authorize(w http.ResponseWriter, session *entities.Session) {
