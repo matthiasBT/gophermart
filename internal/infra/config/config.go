@@ -2,9 +2,12 @@ package config
 
 import (
 	"flag"
+	"time"
 
 	"github.com/caarlos0/env/v9"
 )
+
+const SessionTTL = 2 * time.Minute
 
 type Config struct {
 	ServerAddr  string `env:"RUN_ADDRESS"`

@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
+	"github.com/matthiasBT/gophermart/internal/infra/config"
 	"github.com/matthiasBT/gophermart/internal/infra/logging"
 	"github.com/matthiasBT/gophermart/internal/infra/migrations"
 	"github.com/matthiasBT/gophermart/internal/server/entities"
@@ -43,9 +45,8 @@ func (st *PGStorage) CreateUser(
 		return nil, nil, err
 	}
 	defer tx.Commit()
-	err = tx.SelectContext(
-		ctx, &user, "INSERT INTO users(login, password_hash) VALUES ($1, $2) RETURNING *", userReq.Login, pwdhash,
-	)
+	query := "INSERT INTO users(login, password_hash) VALUES ($1, $2) RETURNING *"
+	err = tx.SelectContext(ctx, &user, query, userReq.Login, pwdhash)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
@@ -58,12 +59,15 @@ func (st *PGStorage) CreateUser(
 	st.logger.Infof("User created: %s", userReq.Login)
 	session, err := st.CreateSession(ctx, tx, &user[0], sessionToken)
 	if err != nil {
+		tx.Rollback()
 		return nil, nil, err
 	}
 	return &user[0], session, nil
 }
 
-func (st *PGStorage) CreateSession(ctx context.Context, tx *sqlx.Tx, user *entities.User, token string) (*entities.Session, error) {
+func (st *PGStorage) CreateSession(
+	ctx context.Context, tx *sqlx.Tx, user *entities.User, token string,
+) (*entities.Session, error) {
 	st.logger.Infof("Creating a session for user %s", user.Login)
 	var session = make([]entities.Session, 1)
 	if tx == nil {
@@ -73,9 +77,9 @@ func (st *PGStorage) CreateSession(ctx context.Context, tx *sqlx.Tx, user *entit
 		}
 		defer tx.Commit()
 	}
-	if err := tx.SelectContext(
-		ctx, &session, "INSERT INTO session(user_id, token) VALUES ($1, $2) RETURNING *", user.ID, token,
-	); err != nil {
+	query := "INSERT INTO session(user_id, token, expires_at) VALUES ($1, $2, $3) RETURNING *"
+	expiresAt := time.Now().Add(config.SessionTTL)
+	if err := tx.SelectContext(ctx, &session, query, user.ID, token, expiresAt); err != nil {
 		st.logger.Errorf("Failed to create a user session: %s", err.Error())
 		return nil, err
 	}
