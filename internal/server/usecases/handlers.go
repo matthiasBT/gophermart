@@ -65,8 +65,8 @@ func (c *BaseController) signIn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *BaseController) createOrder(w http.ResponseWriter, r *http.Request) {
-	userId := r.Context().Value("user_id")
-	if userId == nil {
+	userID := r.Context().Value("user_id")
+	if userID == nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to find the user_id in the context"))
 		return
@@ -75,14 +75,14 @@ func (c *BaseController) createOrder(w http.ResponseWriter, r *http.Request) {
 	if number == nil {
 		return
 	}
-	order, existed, err := c.stor.CreateOrder(r.Context(), userId.(int), *number)
+	order, existed, err := c.stor.CreateOrder(r.Context(), userID.(int), *number)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to create an order"))
 		return
 	}
 	if existed {
-		if order.UserID == userId {
+		if order.UserID == userID {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("already created"))
 		} else {

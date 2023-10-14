@@ -115,7 +115,7 @@ func (st *PGStorage) FindSession(ctx context.Context, token string) (*entities.S
 	return &session, nil
 }
 
-func (st *PGStorage) CreateOrder(ctx context.Context, userId int, number uint64) (*entities.Order, bool, error) {
+func (st *PGStorage) CreateOrder(ctx context.Context, userID int, number uint64) (*entities.Order, bool, error) {
 	order, err := st.FindOrder(ctx, number)
 	if err != nil {
 		return nil, false, err
@@ -126,7 +126,7 @@ func (st *PGStorage) CreateOrder(ctx context.Context, userId int, number uint64)
 	var result = make([]entities.Order, 1)
 	query := "INSERT INTO orders(user_id, number, status, uploaded_at) VALUES ($1, $2, $3, $4) RETURNING *"
 	uploadedAt := time.Now()
-	if err := st.db.SelectContext(ctx, &result, query, userId, number, "NEW", uploadedAt); err != nil {
+	if err := st.db.SelectContext(ctx, &result, query, userID, number, "NEW", uploadedAt); err != nil {
 		st.logger.Errorf("Failed to create an order: %s", err.Error())
 		return nil, false, err
 	}

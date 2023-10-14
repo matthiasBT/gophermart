@@ -18,6 +18,6 @@ type Storage interface {
 	FindUser(ctx context.Context, request *UserAuthRequest) (*User, error)
 	CreateSession(ctx context.Context, tx *sqlx.Tx, user *User, token string) (*Session, error)
 	FindSession(ctx context.Context, token string) (*Session, error)
-	CreateOrder(ctx context.Context, userId int, number uint64) (*Order, bool, error)
+	CreateOrder(ctx context.Context, userID int, number uint64) (*Order, bool, error)
 	FindOrder(ctx context.Context, number uint64) (*Order, error)
 }
