@@ -7,15 +7,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
+	"github.com/matthiasBT/gophermart/internal/infra/auth"
 	"github.com/matthiasBT/gophermart/internal/infra/config"
 	"github.com/matthiasBT/gophermart/internal/infra/logging"
 	"github.com/matthiasBT/gophermart/internal/server/adapters"
+	"github.com/matthiasBT/gophermart/internal/server/entities"
 	"github.com/matthiasBT/gophermart/internal/server/usecases"
 )
 
-func setupServer(logger logging.ILogger, controller *usecases.BaseController) *chi.Mux {
+func setupServer(logger logging.ILogger, storage entities.Storage, controller *usecases.BaseController) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(logging.Middleware(logger))
+	r.Use(auth.Middleware(logger, storage))
 	r.Mount("/", controller.Route())
 	return r
 }
@@ -38,7 +41,7 @@ func main() {
 	storage := adapters.NewPGStorage(logger, db)
 	crypto := adapters.CryptoProvider{Logger: logger}
 	controller := usecases.NewBaseController(logger, storage, &crypto)
-	r := setupServer(logger, controller)
+	r := setupServer(logger, storage, controller)
 
 	srv := http.Server{Addr: conf.ServerAddr, Handler: r}
 	logger.Infof("Launching the server at %s\n", conf.ServerAddr)

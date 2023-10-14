@@ -4,14 +4,17 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 
+	"github.com/ShiraazMoollatjie/goluhn"
 	"github.com/matthiasBT/gophermart/internal/server/entities"
 )
 
 const MinLoginLength = 1
 const MinPasswordLength = 1
+const MinOrderNumberLength = 1
 
-func validateUser(w http.ResponseWriter, r *http.Request) *entities.UserAuthRequest {
+func validateUserAuthReq(w http.ResponseWriter, r *http.Request) *entities.UserAuthRequest {
 	if r.Header.Get("Content-Type") != "application/json" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Supply data as JSON"))
@@ -35,4 +38,31 @@ func validateUser(w http.ResponseWriter, r *http.Request) *entities.UserAuthRequ
 		return nil
 	}
 	return &userReq
+}
+
+func validateOrderNumber(w http.ResponseWriter, r *http.Request) *uint64 {
+	if r.Header.Get("Content-Type") != "text/plain" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Supply data as plaintext"))
+		return nil
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Failed to read request body"))
+		return nil
+	}
+	number := string(body)
+	if len(number) < MinOrderNumberLength {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("The order number is too short"))
+		return nil
+	}
+	if err := goluhn.Validate(number); err != nil {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte("Invalid order number: Luhn algorithm check failed"))
+		return nil
+	}
+	res, _ := strconv.ParseUint(number, 10, 64)
+	return &res
 }

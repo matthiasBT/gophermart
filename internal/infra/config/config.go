@@ -7,7 +7,7 @@ import (
 	"github.com/caarlos0/env/v9"
 )
 
-const SessionTTL = 2 * time.Minute
+const SessionTTL = 1 * time.Hour
 
 type Config struct {
 	ServerAddr  string `env:"RUN_ADDRESS"`

@@ -10,7 +10,7 @@ import (
 )
 
 func (c *BaseController) register(w http.ResponseWriter, r *http.Request) {
-	userReq := validateUser(w, r)
+	userReq := validateUserAuthReq(w, r)
 	if userReq == nil {
 		return
 	}
@@ -34,7 +34,7 @@ func (c *BaseController) register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *BaseController) signIn(w http.ResponseWriter, r *http.Request) {
-	userReq := validateUser(w, r)
+	userReq := validateUserAuthReq(w, r)
 	if userReq == nil {
 		return
 	}
@@ -62,6 +62,36 @@ func (c *BaseController) signIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	authorize(w, session)
+}
+
+func (c *BaseController) createOrder(w http.ResponseWriter, r *http.Request) {
+	userId := r.Context().Value("user_id")
+	if userId == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to find the user_id in the context"))
+		return
+	}
+	number := validateOrderNumber(w, r)
+	if number == nil {
+		return
+	}
+	order, existed, err := c.stor.CreateOrder(r.Context(), userId.(int), *number)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to create an order"))
+		return
+	}
+	if existed {
+		if order.UserID == userId {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("already created"))
+		} else {
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte("already created by another user"))
+		}
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func authorize(w http.ResponseWriter, session *entities.Session) {

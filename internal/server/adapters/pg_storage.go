@@ -73,7 +73,7 @@ func (st *PGStorage) CreateSession(
 		tx = trx
 		defer tx.Commit()
 	}
-	query := "INSERT INTO session(user_id, token, expires_at) VALUES ($1, $2, $3) RETURNING *"
+	query := "INSERT INTO sessions(user_id, token, expires_at) VALUES ($1, $2, $3) RETURNING *"
 	expiresAt := time.Now().Add(config.SessionTTL)
 	if err := tx.SelectContext(ctx, &session, query, user.ID, token, expiresAt); err != nil {
 		st.logger.Errorf("Failed to create a user session: %s", err.Error())
@@ -97,6 +97,57 @@ func (st *PGStorage) FindUser(ctx context.Context, request *entities.UserAuthReq
 	}
 	st.logger.Infoln("User found")
 	return &user, nil
+}
+
+func (st *PGStorage) FindSession(ctx context.Context, token string) (*entities.Session, error) {
+	st.logger.Infof("Looking for a session")
+	var session = entities.Session{}
+	query := "SELECT * FROM sessions WHERE token = $1"
+	if err := st.db.GetContext(ctx, &session, query, token); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			st.logger.Infoln("Session not found")
+			return nil, nil
+		}
+		st.logger.Errorf("Failed to find the session: %s", err.Error())
+		return nil, err
+	}
+	st.logger.Infoln("Session found")
+	return &session, nil
+}
+
+func (st *PGStorage) CreateOrder(ctx context.Context, userId int, number uint64) (*entities.Order, bool, error) {
+	order, err := st.FindOrder(ctx, number)
+	if err != nil {
+		return nil, false, err
+	}
+	if order != nil {
+		return order, true, nil
+	}
+	var result = make([]entities.Order, 1)
+	query := "INSERT INTO orders(user_id, number, status, uploaded_at) VALUES ($1, $2, $3, $4) RETURNING *"
+	uploadedAt := time.Now()
+	if err := st.db.SelectContext(ctx, &result, query, userId, number, "NEW", uploadedAt); err != nil {
+		st.logger.Errorf("Failed to create an order: %s", err.Error())
+		return nil, false, err
+	}
+	st.logger.Infof("Order created!")
+	return &result[0], false, nil
+}
+
+func (st *PGStorage) FindOrder(ctx context.Context, number uint64) (*entities.Order, error) {
+	st.logger.Infof("Searching for an order: %d", number)
+	var order = entities.Order{}
+	query := "SELECT * FROM orders WHERE number = $1"
+	if err := st.db.GetContext(ctx, &order, query, number); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			st.logger.Infoln("Order not found")
+			return nil, nil
+		}
+		st.logger.Errorf("Failed to find the order: %s", err.Error())
+		return nil, err
+	}
+	st.logger.Infoln("Order found")
+	return &order, nil
 }
 
 func (st *PGStorage) tx(ctx context.Context) (*sqlx.Tx, error) {

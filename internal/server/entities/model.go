@@ -19,3 +19,11 @@ type Session struct {
 	Token     string    `db:"token"`
 	ExpiresAt time.Time `db:"expires_at"`
 }
+
+type Order struct {
+	ID         int       `db:"id"`
+	UserID     int       `db:"user_id"`
+	Number     uint64    `db:"number"`
+	Status     string    `db:"status"`
+	UploadedAt time.Time `db:"uploaded_at"`
+}
