@@ -33,15 +33,15 @@ func NewAccrualClient(logger logging.ILogger, url string, retryAfterDefault int,
 	}
 }
 
-func (ac *AccrualClient) GetAccrual(ctx context.Context, orderID int) (*entities.AccrualResponse, error) {
-	ac.logger.Infof("Sending request for order accrual: %d", orderID)
+func (ac *AccrualClient) GetAccrual(ctx context.Context, orderNumber uint64) (*entities.AccrualResponse, error) {
+	ac.logger.Infof("Sending request for order accrual: %d", orderNumber)
 	if err := ac.Lock(ctx); err != nil {
 		return nil, errors.New("mutex locking was cancelled")
 	}
 	defer ac.lock.Unlock()
 	defer ac.logger.Infoln("Exiting GetAccrual, releasing the lock")
 	client := &http.Client{}
-	req, err := ac.constructRequest(ctx, orderID)
+	req, err := ac.constructRequest(ctx, orderNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -102,8 +102,8 @@ func (ac *AccrualClient) GetAccrual(ctx context.Context, orderID int) (*entities
 	return nil, errors.New("unreachable code")
 }
 
-func (ac *AccrualClient) constructRequest(ctx context.Context, orderID int) (*http.Request, error) {
-	path := fmt.Sprintf("%s%s/%d", ac.baseURL, "/api/orders", orderID)
+func (ac *AccrualClient) constructRequest(ctx context.Context, orderNumber uint64) (*http.Request, error) {
+	path := fmt.Sprintf("%s%s/%d", ac.baseURL, "/api/orders", orderNumber)
 	req, err := http.NewRequest("GET", path, nil)
 	if err != nil {
 		ac.logger.Errorf("Failed to construct a request: %s", err.Error())

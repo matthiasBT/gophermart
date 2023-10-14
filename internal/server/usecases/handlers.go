@@ -112,7 +112,7 @@ func (c *BaseController) getOrders(w http.ResponseWriter, r *http.Request) {
 	var result []map[string]any
 	for _, order := range orders {
 		// todo: don't get accrual if can get it directly from db
-		accrualResp, err := c.accrual.GetAccrual(r.Context(), order.ID)
+		accrualResp, err := c.accrual.GetAccrual(r.Context(), order.Number)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("Failed to get data from accrual system"))
