@@ -46,6 +46,7 @@ func (ac *AccrualClient) GetAccrual(ctx context.Context, orderID int) (*entities
 		return nil, err
 	}
 	for i := 0; i < ac.maxAttempts; i++ {
+		ac.logger.Infof("Accrual system request: %s. Attempt: %d", req.URL.String(), i)
 		resp, err := client.Do(req)
 		if err != nil {
 			ac.logger.Errorf("Request failed: %v", err.Error())
@@ -58,6 +59,7 @@ func (ac *AccrualClient) GetAccrual(ctx context.Context, orderID int) (*entities
 			return nil, errors.New("accrual request failed")
 		}
 		if resp.StatusCode == http.StatusOK {
+			ac.logger.Infoln("Status OK")
 			defer resp.Body.Close()
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
@@ -73,8 +75,10 @@ func (ac *AccrualClient) GetAccrual(ctx context.Context, orderID int) (*entities
 			return &accrual, nil
 		}
 		if resp.StatusCode == http.StatusNoContent {
+			ac.logger.Infoln("Status no content")
 			return nil, nil
 		}
+		ac.logger.Infoln("Too many requests, need to wait for a while")
 		var retryAfterDuration int
 		if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
 			retryAfterDuration, err = strconv.Atoi(retryAfter)
@@ -94,6 +98,7 @@ func (ac *AccrualClient) GetAccrual(ctx context.Context, orderID int) (*entities
 			ac.logger.Infof("It's time to retry the request")
 		}
 	}
+	ac.logger.Infoln("Shouldn't be here...")
 	return nil, errors.New("unreachable code")
 }
 
