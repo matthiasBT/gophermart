@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/matthiasBT/gophermart/internal/infra/config"
@@ -116,6 +117,13 @@ func (c *BaseController) getOrders(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("Failed to get data from accrual system"))
 			return
+		}
+		if accrualResp == nil {
+			accrualResp = &entities.AccrualResponse{
+				OrderNumber: strconv.FormatUint(order.Number, 10),
+				Status:      order.Status,
+				Accrual:     0,
+			}
 		}
 		// todo: dump response fields to db
 		val := map[string]any{

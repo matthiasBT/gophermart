@@ -50,7 +50,9 @@ func (ac *AccrualClient) GetAccrual(ctx context.Context, orderID int) (*entities
 			ac.logger.Errorf("Request failed: %v", err.Error())
 			return nil, err
 		}
-		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusTooManyRequests {
+		if resp.StatusCode != http.StatusOK &&
+			resp.StatusCode != http.StatusTooManyRequests &&
+			resp.StatusCode != http.StatusNoContent {
 			ac.logger.Errorf("Non-OK and non-retriable response from the accrual system: %d", resp.StatusCode)
 			return nil, errors.New("accrual request failed")
 		}
@@ -68,6 +70,9 @@ func (ac *AccrualClient) GetAccrual(ctx context.Context, orderID int) (*entities
 			}
 			ac.logger.Infof("Got accrual data for order: %v", accrual)
 			return &accrual, nil
+		}
+		if resp.StatusCode == http.StatusNoContent {
+			return nil, nil
 		}
 		var retryAfterDuration int
 		if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
