@@ -39,6 +39,7 @@ func (ac *AccrualClient) GetAccrual(ctx context.Context, orderID int) (*entities
 		return nil, errors.New("mutex locking was cancelled")
 	}
 	defer ac.lock.Unlock()
+	defer ac.logger.Infoln("Exiting GetAccrual, releasing the lock")
 	client := &http.Client{}
 	req, err := ac.constructRequest(ctx, orderID)
 	if err != nil {
@@ -110,8 +111,14 @@ func (ac *AccrualClient) constructRequest(ctx context.Context, orderID int) (*ht
 func (ac *AccrualClient) Lock(ctx context.Context) error {
 	lockAcquired := make(chan struct{})
 	go func() {
-		ac.lock.Lock()
-		close(lockAcquired)
+		select {
+		case <-ctx.Done():
+			ac.logger.Infoln("Failed to acquire the lock: cancelled")
+			return
+		default:
+			ac.lock.Lock()
+			close(lockAcquired)
+		}
 	}()
 	select {
 	case <-lockAcquired:
