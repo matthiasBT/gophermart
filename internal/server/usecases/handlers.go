@@ -131,6 +131,7 @@ func (c *BaseController) getOrders(w http.ResponseWriter, r *http.Request) {
 		c.logger.Errorf("Failed to marshal the response: %s", err.Error())
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 	w.Write(response)
 }
 

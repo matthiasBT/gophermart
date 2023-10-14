@@ -66,6 +66,7 @@ func (ac *AccrualClient) GetAccrual(ctx context.Context, orderID int) (*entities
 				ac.logger.Errorf("Failed to parse response: %s", err.Error())
 				return nil, err
 			}
+			ac.logger.Infof("Got accrual data for order: %v", accrual)
 			return &accrual, nil
 		}
 		var retryAfterDuration int
