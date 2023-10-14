@@ -2,6 +2,10 @@ package entities
 
 import "time"
 
+type ContextKey struct {
+	Key string
+}
+
 type UserAuthRequest struct {
 	Login    string
 	Password string

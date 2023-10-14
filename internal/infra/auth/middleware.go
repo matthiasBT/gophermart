@@ -40,7 +40,7 @@ func Middleware(logger logging.ILogger, storage entities.Storage) func(next http
 				return
 			}
 			logger.Infof("Session is valid, proceeding...")
-			ctx := context.WithValue(r.Context(), "user_id", session.UserID)
+			ctx := context.WithValue(r.Context(), entities.ContextKey{Key: "user_id"}, session.UserID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 		return http.HandlerFunc(checkAuthFn)

@@ -65,7 +65,7 @@ func (c *BaseController) signIn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *BaseController) createOrder(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id")
+	userID := r.Context().Value(entities.ContextKey{Key: "user_id"})
 	if userID == nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to find the user_id in the context"))
