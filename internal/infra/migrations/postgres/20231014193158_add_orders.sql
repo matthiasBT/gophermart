@@ -1,7 +1,6 @@
 -- +goose Up
 -- +goose StatementBegin
-create type order_status as enum ('NEW', 'PROCESSING', 'INVALID', 'PROCESSED');
-
+create type order_status as enum ('NEW', 'REGISTERED', 'PROCESSING', 'INVALID', 'PROCESSED');
 create table orders(
     id integer primary key generated always as identity,
     user_id integer references users(id) not null,
@@ -14,4 +13,5 @@ create table orders(
 -- +goose Down
 -- +goose StatementBegin
 drop table orders;
+drop type order_status;
 -- +goose StatementEnd

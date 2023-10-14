@@ -29,5 +29,18 @@ type Order struct {
 	UserID     int       `db:"user_id"`
 	Number     uint64    `db:"number"`
 	Status     string    `db:"status"`
+	Accrual    float32   `db:"accrual"` // todo: need to join another table to get it
 	UploadedAt time.Time `db:"uploaded_at"`
+}
+
+type Accrual struct {
+	OrderID int     `db:"order_id"`
+	Status  string  `db:"status"`
+	Accrual float32 `db:"accrual"`
+}
+
+type AccrualResponse struct {
+	OrderNumber string  `json:"order"`
+	Status      string  `json:"status"`
+	Accrual     float32 `json:"accrual"`
 }

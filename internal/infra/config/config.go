@@ -8,6 +8,8 @@ import (
 )
 
 const SessionTTL = 1 * time.Hour
+const MaxAccrualRequestAttempts = 5
+const DefaultAccrualRequestTimeoutSec = 10
 
 type Config struct {
 	ServerAddr  string `env:"RUN_ADDRESS"`

@@ -40,7 +40,10 @@ func main() {
 	defer db.Close()
 	storage := adapters.NewPGStorage(logger, db)
 	crypto := adapters.CryptoProvider{Logger: logger}
-	controller := usecases.NewBaseController(logger, storage, &crypto)
+	accrualDriver := adapters.NewAccrualClient(
+		logger, conf.AccrualAddr, config.DefaultAccrualRequestTimeoutSec, config.MaxAccrualRequestAttempts,
+	)
+	controller := usecases.NewBaseController(logger, storage, &crypto, accrualDriver)
 	r := setupServer(logger, storage, controller)
 
 	srv := http.Server{Addr: conf.ServerAddr, Handler: r}
