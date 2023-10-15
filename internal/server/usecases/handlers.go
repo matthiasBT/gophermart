@@ -111,25 +111,47 @@ func (c *BaseController) getOrders(w http.ResponseWriter, r *http.Request) {
 	}
 	var result []map[string]any
 	for _, order := range orders {
-		// todo: don't get accrual if can get it directly from db
-		accrualResp, err := c.accrual.GetAccrual(r.Context(), order.Number)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Failed to get data from accrual system"))
-			return
-		}
-		if accrualResp == nil {
-			accrualResp = &entities.AccrualResponse{
-				OrderNumber: strconv.FormatUint(order.Number, 10),
-				Status:      order.Status,
-				Accrual:     0,
+		var number string
+		var status string
+		var amount float32
+
+		if order.Status == "INVALID" || order.Status == "PROCESSED" {
+			number = strconv.FormatUint(order.Number, 10)
+			status = order.Status
+			amount = order.Accrual
+		} else {
+			accrualResp, err := c.accrual.GetAccrual(r.Context(), order.Number)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Failed to get data from accrual system"))
+				return
 			}
+			if accrualResp == nil {
+				accrualResp = &entities.AccrualResponse{
+					OrderNumber: strconv.FormatUint(order.Number, 10),
+					Status:      order.Status,
+					Amount:      0.0,
+				}
+			} else if accrualResp.Status == "INVALID" || accrualResp.Status == "PROCESSED" {
+				accr := entities.Accrual{
+					UserID:  *userID,
+					OrderID: order.ID,
+					Amount:  accrualResp.Amount,
+				}
+				if err := c.stor.CreateAccrual(r.Context(), &accr); err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte("Failed to store accrual response in the db"))
+					return
+				}
+			}
+			number = accrualResp.OrderNumber
+			status = accrualResp.Status
+			amount = accrualResp.Amount
 		}
-		// todo: dump response fields to db
 		val := map[string]any{
-			"number":      accrualResp.OrderNumber,
-			"status":      accrualResp.Status,
-			"accrual":     accrualResp.Accrual,
+			"number":      number,
+			"status":      status,
+			"accrual":     amount,
 			"uploaded_at": order.UploadedAt.Format(time.RFC3339),
 		}
 		result = append(result, val)

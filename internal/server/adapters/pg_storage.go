@@ -116,6 +116,7 @@ func (st *PGStorage) FindSession(ctx context.Context, token string) (*entities.S
 }
 
 func (st *PGStorage) CreateOrder(ctx context.Context, userID int, number uint64) (*entities.Order, bool, error) {
+	st.logger.Infof("Creating order %d for user %d", number, userID)
 	order, err := st.FindOrder(ctx, number)
 	if err != nil {
 		return nil, false, err
@@ -153,7 +154,13 @@ func (st *PGStorage) FindOrder(ctx context.Context, number uint64) (*entities.Or
 func (st *PGStorage) FindUserOrders(ctx context.Context, userID int) ([]entities.Order, error) {
 	st.logger.Infof("Searching for user's orders: %d", userID)
 	var orders []entities.Order
-	query := "select * from orders where user_id = $1 order by uploaded_at"
+	query := `
+		select o.*, coalesce(a.amount, 0) as "accrual"
+		from orders o
+		left join accrual a on o.id = a.order_id
+		where o.user_id = $1
+		order by uploaded_at
+	`
 	if err := st.db.SelectContext(ctx, &orders, query, userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			st.logger.Infoln("Orders not found")
@@ -164,6 +171,19 @@ func (st *PGStorage) FindUserOrders(ctx context.Context, userID int) ([]entities
 	}
 	st.logger.Infoln("Orders found")
 	return orders, nil
+}
+
+func (st *PGStorage) CreateAccrual(ctx context.Context, accrual *entities.Accrual) error {
+	st.logger.Infof(
+		"Creating accrual. User: %d, order: %d, amount: %f", accrual.UserID, accrual.OrderID, accrual.Amount,
+	)
+	query := "insert into accrual(user_id, order_id, amount) values ($1, $2, $3)"
+	if _, err := st.db.ExecContext(ctx, query, accrual.UserID, accrual.OrderID, accrual.Amount); err != nil {
+		st.logger.Errorf("Failed to create accrual: %s", err.Error())
+		return err
+	}
+	st.logger.Infof("Accrual created!")
+	return nil
 }
 
 func (st *PGStorage) tx(ctx context.Context) (*sqlx.Tx, error) {

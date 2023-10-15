@@ -113,6 +113,8 @@ func (ac *AccrualClient) constructRequest(ctx context.Context, orderNumber uint6
 	return req, nil
 }
 
+// TODO: refactor
+
 func (ac *AccrualClient) Lock(ctx context.Context) error {
 	lockAcquired := make(chan struct{})
 	go func() {

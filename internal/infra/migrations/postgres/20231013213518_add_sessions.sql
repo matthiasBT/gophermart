@@ -6,9 +6,11 @@ create table sessions(
     token text unique not null,
     expires_at timestamptz not null
 );
+create index sessions_user_id_idx on sessions(user_id);
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
+drop index sessions_user_id_idx;
 drop table sessions;
 -- +goose StatementEnd
