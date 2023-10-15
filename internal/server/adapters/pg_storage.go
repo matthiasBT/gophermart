@@ -189,25 +189,23 @@ func (st *PGStorage) CreateAccrual(ctx context.Context, accrual *entities.Accrua
 func (st *PGStorage) GetBalance(ctx context.Context, userID int) (*entities.Balance, error) {
 	st.logger.Infof("Calculating user balance: %d", userID)
 	var balance = entities.Balance{}
-	var raw = make([]float32, 2)
 	query := `
-		select array_agg(amount) from (
-		   select 1 as idx, coalesce(sum(a.amount), 0.0) as amount
-		   from accruals a
-		   where a.user_id = $1
-		   union all
-		   select 2 idx, coalesce(sum(w.amount), 0.0) as amount
-		   from withdrawals w
-		   where w.user_id = $1
-		   order by idx
-		) alias
-		
+		select 
+			(
+				select coalesce(sum(a.amount), 0.0)
+				from accruals a
+		   		where a.user_id = $1
+		   	) as current,
+			(
+		        select coalesce(sum(w.amount), 0.0)
+		   		from withdrawals w
+		   		where w.user_id = $1
+			) as withdrawn
 	`
-	if err := st.db.GetContext(ctx, &raw, query, userID); err != nil {
+	if err := st.db.GetContext(ctx, &balance, query, userID); err != nil {
 		st.logger.Errorf("Failed to calculate balance: %s", err.Error())
 		return nil, err
 	}
-	balance.Current, balance.WithDrawn = raw[0], raw[1]
 	st.logger.Infoln("Balance calculated")
 	return &balance, nil
 }
