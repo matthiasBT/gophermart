@@ -190,17 +190,18 @@ func (st *PGStorage) GetBalance(ctx context.Context, userID int) (*entities.Bala
 	st.logger.Infof("Calculating user balance: %d", userID)
 	var balance = entities.Balance{}
 	query := `
-		select 
-			(
-				select coalesce(sum(a.amount), 0.0)
-				from accruals a
-		   		where a.user_id = $1
-		   	) as current,
-			(
-		        select coalesce(sum(w.amount), 0.0)
-		   		from withdrawals w
-		   		where w.user_id = $1
-			) as withdrawn
+		with accruals as (
+			select coalesce(sum(a.amount), 0.0) as amount
+			from accruals a
+			where a.user_id = $1
+		), withdrawals as (
+			select coalesce(sum(w.amount), 0.0) as amount
+			from withdrawals w
+			where w.user_id = $1
+		)
+		select
+			(select amount from accruals) - (select amount from withdrawals) as current,
+			(select amount from withdrawals) as withdrawn
 	`
 	if err := st.db.GetContext(ctx, &balance, query, userID); err != nil {
 		st.logger.Errorf("Failed to calculate balance: %s", err.Error())
@@ -219,9 +220,9 @@ func (st *PGStorage) CreateWithdrawal(
 		withdrawal.OrderNumber,
 		withdrawal.Amount,
 	)
-	query := "insert into withdrawal(user_id, order_id, amount) values ($1, $2, $3)"
+	query := "insert into withdrawals(user_id, order_number, amount) values ($1, $2, $3) returning *"
 	var res = entities.Withdrawal{}
-	if err := st.db.SelectContext(ctx, &res, query, withdrawal.UserID, withdrawal.OrderID, withdrawal.Amount); err != nil {
+	if err := st.db.GetContext(ctx, &res, query, withdrawal.UserID, withdrawal.OrderNumber, withdrawal.Amount); err != nil {
 		st.logger.Errorf("Failed to create withdrawal: %s", err.Error())
 		return nil, err
 	}

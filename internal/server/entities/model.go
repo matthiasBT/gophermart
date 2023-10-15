@@ -56,15 +56,14 @@ type Balance struct {
 }
 
 type WithdrawalRequest struct {
-	Number string  `json:"number"`
+	Number string  `json:"order"`
 	Sum    float32 `json:"sum"`
 }
 
 type Withdrawal struct {
-	ID          int    `db:"id"`
-	UserID      int    `db:"user_id"`
-	OrderID     string `db:"order_id"`
-	OrderNumber uint64
+	ID          int     `db:"id"`
+	UserID      int     `db:"user_id"`
+	OrderNumber uint64  `db:"order_number"`
 	Amount      float32 `db:"amount"`
 }
 
