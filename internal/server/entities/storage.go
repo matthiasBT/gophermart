@@ -22,4 +22,5 @@ type Storage interface {
 	FindOrder(ctx context.Context, number uint64) (*Order, error)
 	FindUserOrders(ctx context.Context, userID int) ([]Order, error)
 	CreateAccrual(ctx context.Context, accrual *Accrual) error
+	GetBalance(ctx context.Context, userID int) (*Balance, error)
 }

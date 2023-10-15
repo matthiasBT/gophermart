@@ -45,3 +45,8 @@ type AccrualResponse struct {
 	Status      string  `json:"status"`
 	Amount      float32 `json:"accrual"`
 }
+
+type Balance struct {
+	Current   float32 `db:"current" json:"current"`
+	WithDrawn float32 `db:"withdrawn" json:"withdrawn"`
+}

@@ -158,7 +158,29 @@ func (c *BaseController) getOrders(w http.ResponseWriter, r *http.Request) {
 	}
 	response, err := json.Marshal(result)
 	if err != nil {
-		c.logger.Errorf("Failed to marshal the response: %s", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to marshal the result"))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(response)
+}
+
+func (c *BaseController) getBalance(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(w, r)
+	if userID == nil {
+		return
+	}
+	result, err := c.stor.GetBalance(r.Context(), *userID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to read user balance"))
+		return
+	}
+	response, err := json.Marshal(result)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to marshal the result"))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

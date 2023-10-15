@@ -186,6 +186,22 @@ func (st *PGStorage) CreateAccrual(ctx context.Context, accrual *entities.Accrua
 	return nil
 }
 
+func (st *PGStorage) GetBalance(ctx context.Context, userID int) (*entities.Balance, error) {
+	st.logger.Infof("Calculating user balance: %d", userID)
+	var balance = entities.Balance{}
+	query := `
+		select coalesce(sum(a.amount), 0.0) as current
+		from accrual a
+		where a.user_id = $1
+	`
+	if err := st.db.GetContext(ctx, &balance, query, userID); err != nil {
+		st.logger.Errorf("Failed to calculate balance: %s", err.Error())
+		return nil, err
+	}
+	st.logger.Infoln("Balance calculated")
+	return &balance, nil
+}
+
 func (st *PGStorage) tx(ctx context.Context) (*sqlx.Tx, error) {
 	tx, err := st.db.BeginTxx(ctx, &txOpt)
 	if err != nil {

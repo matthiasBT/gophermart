@@ -28,5 +28,6 @@ func (c *BaseController) Route() *chi.Mux {
 	r.Post("/api/user/login", c.signIn)
 	r.Post("/api/user/orders", c.createOrder)
 	r.Get("/api/user/orders", c.getOrders)
+	r.Get("/api/user/balance", c.getBalance)
 	return r
 }
