@@ -157,7 +157,7 @@ func (st *PGStorage) FindUserOrders(ctx context.Context, userID int) ([]entities
 	query := `
 		select o.*, coalesce(a.amount, 0) as "accrual"
 		from orders o
-		left join accrual a on o.id = a.order_id
+		left join accruals a on o.id = a.order_id
 		where o.user_id = $1
 		order by uploaded_at
 	`
@@ -177,7 +177,7 @@ func (st *PGStorage) CreateAccrual(ctx context.Context, accrual *entities.Accrua
 	st.logger.Infof(
 		"Creating accrual. User: %d, order: %d, amount: %f", accrual.UserID, accrual.OrderID, accrual.Amount,
 	)
-	query := "insert into accrual(user_id, order_id, amount) values ($1, $2, $3)"
+	query := "insert into accruals(user_id, order_id, amount) values ($1, $2, $3)"
 	if _, err := st.db.ExecContext(ctx, query, accrual.UserID, accrual.OrderID, accrual.Amount); err != nil {
 		st.logger.Errorf("Failed to create accrual: %s", err.Error())
 		return err
@@ -189,17 +189,46 @@ func (st *PGStorage) CreateAccrual(ctx context.Context, accrual *entities.Accrua
 func (st *PGStorage) GetBalance(ctx context.Context, userID int) (*entities.Balance, error) {
 	st.logger.Infof("Calculating user balance: %d", userID)
 	var balance = entities.Balance{}
+	var raw = make([]float32, 2)
 	query := `
-		select coalesce(sum(a.amount), 0.0) as current
-		from accrual a
-		where a.user_id = $1
+		select array_agg(amount) from (
+		   select 1 as idx, coalesce(sum(a.amount), 0.0) as amount
+		   from accruals a
+		   where a.user_id = $1
+		   union all
+		   select 2 idx, coalesce(sum(w.amount), 0.0) as amount
+		   from withdrawals w
+		   where w.user_id = $1
+		   order by idx
+		) alias
+		
 	`
-	if err := st.db.GetContext(ctx, &balance, query, userID); err != nil {
+	if err := st.db.GetContext(ctx, &raw, query, userID); err != nil {
 		st.logger.Errorf("Failed to calculate balance: %s", err.Error())
 		return nil, err
 	}
+	balance.Current, balance.WithDrawn = raw[0], raw[1]
 	st.logger.Infoln("Balance calculated")
 	return &balance, nil
+}
+
+func (st *PGStorage) CreateWithdrawal(
+	ctx context.Context, withdrawal *entities.Withdrawal,
+) (*entities.Withdrawal, error) {
+	st.logger.Infof(
+		"Creating withdrawal for user: %d, order: %d, amount: %f",
+		withdrawal.UserID,
+		withdrawal.OrderNumber,
+		withdrawal.Amount,
+	)
+	query := "insert into withdrawal(user_id, order_id, amount) values ($1, $2, $3)"
+	var res = entities.Withdrawal{}
+	if err := st.db.SelectContext(ctx, &res, query, withdrawal.UserID, withdrawal.OrderID, withdrawal.Amount); err != nil {
+		st.logger.Errorf("Failed to create withdrawal: %s", err.Error())
+		return nil, err
+	}
+	st.logger.Infof("Withdrawal created!")
+	return &res, nil
 }
 
 func (st *PGStorage) tx(ctx context.Context) (*sqlx.Tx, error) {

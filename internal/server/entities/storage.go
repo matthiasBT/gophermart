@@ -8,9 +8,7 @@ import (
 )
 
 var (
-	ErrLoginAlreadyTaken   = errors.New("login already taken")
-	ErrOrderAlreadyCreated = errors.New("order already created")
-	ErrOrderCreatedByOther = errors.New("order created by other user")
+	ErrLoginAlreadyTaken = errors.New("login already taken")
 )
 
 type Storage interface {
@@ -23,4 +21,5 @@ type Storage interface {
 	FindUserOrders(ctx context.Context, userID int) ([]Order, error)
 	CreateAccrual(ctx context.Context, accrual *Accrual) error
 	GetBalance(ctx context.Context, userID int) (*Balance, error)
+	CreateWithdrawal(ctx context.Context, withdrawal *Withdrawal) (*Withdrawal, error)
 }

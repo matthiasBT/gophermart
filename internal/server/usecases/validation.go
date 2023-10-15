@@ -66,3 +66,37 @@ func validateOrderNumber(w http.ResponseWriter, r *http.Request) *uint64 {
 	res, _ := strconv.ParseUint(number, 10, 64)
 	return &res
 }
+
+func validateWithdrawal(w http.ResponseWriter, r *http.Request, userID int) *entities.Withdrawal {
+	if r.Header.Get("Content-Type") != "application/json" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Supply data as JSON"))
+		return nil
+	}
+	var withdrawal entities.Withdrawal
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Failed to read request body"))
+		return nil
+	}
+	if err := json.Unmarshal(body, &withdrawal); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Failed to parse withdrawal request"))
+		return nil
+	}
+	// TODO: DRY
+	number := strconv.FormatUint(withdrawal.OrderNumber, 10)
+	if len(number) < MinOrderNumberLength {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("The order number is too short"))
+		return nil
+	}
+	if err := goluhn.Validate(number); err != nil {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte("Invalid order number: Luhn algorithm check failed"))
+		return nil
+	}
+	withdrawal.UserID = userID
+	return &withdrawal
+}

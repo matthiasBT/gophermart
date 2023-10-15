@@ -187,6 +187,33 @@ func (c *BaseController) getBalance(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
+func (c *BaseController) withdraw(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(w, r)
+	if userID == nil {
+		return
+	}
+	withdrawal := validateWithdrawal(w, r, *userID)
+	if withdrawal == nil {
+		return
+	}
+	balance, err := c.stor.GetBalance(r.Context(), *userID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to check user balance"))
+		return
+	}
+	if balance.Current < withdrawal.Amount {
+		w.WriteHeader(http.StatusPaymentRequired)
+		w.Write([]byte("insufficient funds"))
+		return
+	}
+	if _, err := c.stor.CreateWithdrawal(r.Context(), withdrawal); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("failed to create withdrawal"))
+		return
+	}
+}
+
 func authorize(w http.ResponseWriter, session *entities.Session) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",

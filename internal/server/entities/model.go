@@ -1,6 +1,10 @@
 package entities
 
-import "time"
+import (
+	"encoding/json"
+	"strconv"
+	"time"
+)
 
 type ContextKey struct {
 	Key string
@@ -49,4 +53,31 @@ type AccrualResponse struct {
 type Balance struct {
 	Current   float32 `db:"current" json:"current"`
 	WithDrawn float32 `db:"withdrawn" json:"withdrawn"`
+}
+
+type WithdrawalRequest struct {
+	Number string  `json:"number"`
+	Sum    float32 `json:"sum"`
+}
+
+type Withdrawal struct {
+	ID          int    `db:"id"`
+	UserID      int    `db:"user_id"`
+	OrderID     string `db:"order_id"`
+	OrderNumber uint64
+	Amount      float32 `db:"amount"`
+}
+
+func (w *Withdrawal) UnmarshalJSON(data []byte) error {
+	req := &WithdrawalRequest{}
+	if err := json.Unmarshal(data, req); err != nil {
+		return err
+	}
+	number, err := strconv.ParseUint(req.Number, 10, 64)
+	if err != nil {
+		return err
+	}
+	w.OrderNumber = number
+	w.Amount = req.Sum
+	return nil
 }

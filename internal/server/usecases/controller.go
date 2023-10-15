@@ -24,10 +24,11 @@ func NewBaseController(logger logging.ILogger, stor entities.Storage, crypto ent
 
 func (c *BaseController) Route() *chi.Mux {
 	r := chi.NewRouter()
-	r.Post("/api/user/register", c.register)
+	r.Post("/api/user/register", c.register) // todo: mount with prefix
 	r.Post("/api/user/login", c.signIn)
 	r.Post("/api/user/orders", c.createOrder)
 	r.Get("/api/user/orders", c.getOrders)
 	r.Get("/api/user/balance", c.getBalance)
+	r.Post("/api/user/balance/withdraw", c.withdraw)
 	return r
 }
