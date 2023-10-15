@@ -61,10 +61,11 @@ type WithdrawalRequest struct {
 }
 
 type Withdrawal struct {
-	ID          int     `db:"id"`
-	UserID      int     `db:"user_id"`
-	OrderNumber uint64  `db:"order_number"`
-	Amount      float32 `db:"amount"`
+	ID          int       `db:"id"`
+	UserID      int       `db:"user_id"`
+	OrderNumber uint64    `db:"order_number"`
+	Amount      float32   `db:"amount"`
+	ProcessedAt time.Time `db:"processed_at"`
 }
 
 func (w *Withdrawal) UnmarshalJSON(data []byte) error {

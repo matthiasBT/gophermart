@@ -22,4 +22,5 @@ type Storage interface {
 	CreateAccrual(ctx context.Context, accrual *Accrual) error
 	GetBalance(ctx context.Context, userID int) (*Balance, error)
 	CreateWithdrawal(ctx context.Context, withdrawal *Withdrawal) (*Withdrawal, error)
+	FindUserWithdrawals(ctx context.Context, userID int) ([]Withdrawal, error)
 }

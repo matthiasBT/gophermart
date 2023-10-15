@@ -128,7 +128,7 @@ func (c *BaseController) getOrders(w http.ResponseWriter, r *http.Request) {
 			}
 			if accrualResp == nil {
 				accrualResp = &entities.AccrualResponse{
-					OrderNumber: strconv.FormatUint(order.Number, 10),
+					OrderNumber: strconv.FormatUint(order.Number, 10), // todo: custom marshalling?
 					Status:      order.Status,
 					Amount:      0.0,
 				}
@@ -148,6 +148,7 @@ func (c *BaseController) getOrders(w http.ResponseWriter, r *http.Request) {
 			status = accrualResp.Status
 			amount = accrualResp.Amount
 		}
+		// TODO: refactor with custom marshal function
 		val := map[string]any{
 			"number":      number,
 			"status":      status,
@@ -212,6 +213,40 @@ func (c *BaseController) withdraw(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("failed to create withdrawal"))
 		return
 	}
+}
+
+func (c *BaseController) getWithdrawals(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(w, r)
+	if userID == nil {
+		return
+	}
+	withdrawals, err := c.stor.FindUserWithdrawals(r.Context(), *userID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to find user's withdrawals"))
+		return
+	}
+	if withdrawals == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	var result []map[string]any
+	for _, w := range withdrawals {
+		val := map[string]any{
+			"order":        strconv.FormatUint(w.OrderNumber, 10),
+			"sum":          w.Amount,
+			"processed_at": w.ProcessedAt.Format(time.RFC3339),
+		}
+		result = append(result, val)
+	}
+	response, err := json.Marshal(result)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to marshal the result"))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(response)
 }
 
 func authorize(w http.ResponseWriter, session *entities.Session) {

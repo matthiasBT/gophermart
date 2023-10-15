@@ -126,8 +126,7 @@ func (st *PGStorage) CreateOrder(ctx context.Context, userID int, number uint64)
 	}
 	var result = entities.Order{}
 	query := "insert into orders(user_id, number, status, uploaded_at) values ($1, $2, $3, $4) returning *"
-	uploadedAt := time.Now()
-	if err := st.db.GetContext(ctx, &result, query, userID, number, "NEW", uploadedAt); err != nil {
+	if err := st.db.GetContext(ctx, &result, query, userID, number, "NEW", time.Now()); err != nil {
 		st.logger.Errorf("Failed to create an order: %s", err.Error())
 		return nil, false, err
 	}
@@ -220,14 +219,32 @@ func (st *PGStorage) CreateWithdrawal(
 		withdrawal.OrderNumber,
 		withdrawal.Amount,
 	)
-	query := "insert into withdrawals(user_id, order_number, amount) values ($1, $2, $3) returning *"
+	query := "insert into withdrawals(user_id, order_number, amount, processed_at) values ($1, $2, $3, $4) returning *"
 	var res = entities.Withdrawal{}
-	if err := st.db.GetContext(ctx, &res, query, withdrawal.UserID, withdrawal.OrderNumber, withdrawal.Amount); err != nil {
+	if err := st.db.GetContext(
+		ctx, &res, query, withdrawal.UserID, withdrawal.OrderNumber, withdrawal.Amount, time.Now(),
+	); err != nil {
 		st.logger.Errorf("Failed to create withdrawal: %s", err.Error())
 		return nil, err
 	}
 	st.logger.Infof("Withdrawal created!")
 	return &res, nil
+}
+
+func (st *PGStorage) FindUserWithdrawals(ctx context.Context, userID int) ([]entities.Withdrawal, error) {
+	st.logger.Infof("Getting user withdrawals: %d", userID)
+	var withdrawals []entities.Withdrawal
+	query := `select * from withdrawals where user_id = $1 order by processed_at`
+	if err := st.db.SelectContext(ctx, &withdrawals, query, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			st.logger.Infoln("Withdrawals not found")
+			return nil, nil
+		}
+		st.logger.Errorf("Failed to find the withdrawals: %s", err.Error())
+		return nil, err
+	}
+	st.logger.Infoln("Withdrawals found")
+	return withdrawals, nil
 }
 
 func (st *PGStorage) tx(ctx context.Context) (*sqlx.Tx, error) {

@@ -19,7 +19,7 @@ func setupServer(logger logging.ILogger, storage entities.Storage, controller *u
 	r := chi.NewRouter()
 	r.Use(logging.Middleware(logger))
 	r.Use(auth.Middleware(logger, storage))
-	r.Mount("/", controller.Route())
+	r.Mount("/api", controller.Route())
 	return r
 }
 
