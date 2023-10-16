@@ -7,11 +7,11 @@ create table withdrawals(
     amount float not null,
     processed_at timestamptz not null
 );
-create index withdrawals_user_id_idx on withdrawals(user_id);
+create index user_withdrawals_idx on withdrawals(user_id);
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
-drop index withdrawals_user_id_idx;
+drop index user_withdrawals_idx;
 drop table withdrawals;
 -- +goose StatementEnd

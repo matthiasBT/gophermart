@@ -23,6 +23,5 @@ func (cr *CryptoProvider) CheckPassword(password string, hash []byte) error {
 		cr.Logger.Errorf("Password hash didn't match the password: %s", err.Error())
 		return err
 	}
-	cr.Logger.Infoln("The password matched the hash")
 	return nil
 }

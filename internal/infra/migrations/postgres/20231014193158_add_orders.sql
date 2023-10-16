@@ -8,12 +8,12 @@ create table orders(
     status order_status not null,
     uploaded_at timestamptz not null
 );
-create index order_user_id_idx on orders(user_id);
+create index user_orders_idx on orders(user_id);
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
-drop index order_user_id_idx;
+drop index user_orders_idx;
 drop table orders;
 drop type order_status;
 -- +goose StatementEnd

@@ -15,8 +15,6 @@ type extendedWriter struct {
 	response *responseMetadata
 }
 
-// TODO: add tests for status code and body size?
-
 func (w *extendedWriter) Write(b []byte) (int, error) {
 	size, err := w.ResponseWriter.Write(b)
 	w.response.size += size

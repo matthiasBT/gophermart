@@ -39,58 +39,32 @@ func (ac *AccrualClient) GetAccrual(ctx context.Context, orderNumber uint64) (*e
 		return nil, errors.New("mutex locking was cancelled")
 	}
 	defer ac.lock.Unlock()
-	defer ac.logger.Infoln("Exiting GetAccrual, releasing the lock")
 	client := &http.Client{}
 	req, err := ac.constructRequest(ctx, orderNumber)
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < ac.maxAttempts; i++ {
+	for i := 1; i <= ac.maxAttempts; i++ {
 		ac.logger.Infof("Accrual system request: %s. Attempt: %d", req.URL.String(), i)
 		resp, err := client.Do(req)
 		if err != nil {
 			ac.logger.Errorf("Request failed: %v", err.Error())
 			return nil, err
 		}
-		if resp.StatusCode != http.StatusOK &&
-			resp.StatusCode != http.StatusTooManyRequests &&
-			resp.StatusCode != http.StatusNoContent {
-			ac.logger.Errorf("Non-OK and non-retriable response from the accrual system: %d", resp.StatusCode)
-			return nil, errors.New("accrual request failed")
+		if err := ac.checkResponseCode(resp); err != nil {
+			return nil, err
 		}
 		if resp.StatusCode == http.StatusOK {
-			ac.logger.Infoln("Status OK")
-			defer resp.Body.Close()
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				ac.logger.Errorf("Failed to read response body: %s", err.Error())
-				return nil, err
-			}
-			var accrual entities.AccrualResponse
-			if err := json.Unmarshal(body, &accrual); err != nil {
-				ac.logger.Errorf("Failed to parse response: %s", err.Error())
-				return nil, err
-			}
-			ac.logger.Infof("Got accrual data for order: %v", accrual)
-			return &accrual, nil
+			return ac.parseAccrualResponse(resp)
 		}
 		if resp.StatusCode == http.StatusNoContent {
 			ac.logger.Infoln("Status no content")
 			return nil, nil
 		}
-		ac.logger.Infoln("Too many requests, need to wait for a while")
-		var retryAfterDuration int
-		if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
-			retryAfterDuration, err = strconv.Atoi(retryAfter)
-			if err != nil {
-				ac.logger.Errorf("Invalid Retry-After header value: %s", retryAfter)
-				return nil, errors.New("invalid Retry-After header")
-			}
-		} else {
-			retryAfterDuration = ac.retryAfterDefault
+		timeout, err := ac.parseRetryAfterHeader(resp)
+		if err != nil {
+			return nil, err
 		}
-		timeout := time.Duration(retryAfterDuration) * time.Second
-		ac.logger.Warningf("Retrying after %d seconds", retryAfterDuration)
 		select {
 		case <-ctx.Done():
 			return nil, errors.New("request aborted")
@@ -98,8 +72,8 @@ func (ac *AccrualClient) GetAccrual(ctx context.Context, orderNumber uint64) (*e
 			ac.logger.Infof("It's time to retry the request")
 		}
 	}
-	ac.logger.Infoln("Shouldn't be here...")
-	return nil, errors.New("unreachable code")
+	ac.logger.Errorf("Failed to get data from the accrual system")
+	return nil, errors.New("no accrual system response")
 }
 
 func (ac *AccrualClient) constructRequest(ctx context.Context, orderNumber uint64) (*http.Request, error) {
@@ -134,4 +108,50 @@ func (ac *AccrualClient) Lock(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func (ac *AccrualClient) checkResponseCode(resp *http.Response) error {
+	if resp.StatusCode != http.StatusOK &&
+		resp.StatusCode != http.StatusTooManyRequests &&
+		resp.StatusCode != http.StatusNoContent {
+		ac.logger.Errorf("Non-OK and non-retriable response from the accrual system: %d", resp.StatusCode)
+		return errors.New("accrual request failed")
+	}
+	return nil
+}
+
+func (ac *AccrualClient) parseAccrualResponse(resp *http.Response) (*entities.AccrualResponse, error) {
+	ac.logger.Infoln("Status OK")
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		ac.logger.Errorf("Failed to read response body: %s", err.Error())
+		return nil, err
+	}
+	var accrual entities.AccrualResponse
+	if err := json.Unmarshal(body, &accrual); err != nil {
+		ac.logger.Errorf("Failed to parse response: %s", err.Error())
+		return nil, err
+	}
+	ac.logger.Infof("Got accrual data for order: %v", accrual)
+	return &accrual, nil
+}
+
+func (ac *AccrualClient) parseRetryAfterHeader(resp *http.Response) (time.Duration, error) {
+	ac.logger.Infoln("Too many requests, need to wait for a while")
+	var (
+		retryAfterDuration int
+		err                error
+	)
+	if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
+		retryAfterDuration, err = strconv.Atoi(retryAfter)
+		if err != nil {
+			ac.logger.Errorf("Invalid Retry-After header value: %s", retryAfter)
+			return 0, errors.New("invalid Retry-After header")
+		}
+	} else {
+		retryAfterDuration = ac.retryAfterDefault
+	}
+	ac.logger.Warningf("Retrying after %d seconds", retryAfterDuration)
+	return time.Duration(retryAfterDuration) * time.Second, nil
 }

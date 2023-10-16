@@ -39,7 +39,6 @@ func Middleware(logger logging.ILogger, storage entities.Storage) func(next http
 				w.Write([]byte("Session has expired"))
 				return
 			}
-			logger.Infof("Session is valid, proceeding...")
 			ctx := context.WithValue(r.Context(), entities.ContextKey{Key: "user_id"}, session.UserID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
