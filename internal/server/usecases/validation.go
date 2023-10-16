@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -53,14 +54,7 @@ func validateOrderNumber(w http.ResponseWriter, r *http.Request) *uint64 {
 		return nil
 	}
 	number := string(body)
-	if len(number) < MinOrderNumberLength {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("The order number is too short"))
-		return nil
-	}
-	if err := goluhn.Validate(number); err != nil {
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		w.Write([]byte("Invalid order number: Luhn algorithm check failed"))
+	if err := validatePlainOrderNumber(w, number); err != nil {
 		return nil
 	}
 	res, _ := strconv.ParseUint(number, 10, 64)
@@ -85,18 +79,24 @@ func validateWithdrawal(w http.ResponseWriter, r *http.Request, userID int) *ent
 		w.Write([]byte("Failed to parse withdrawal request"))
 		return nil
 	}
-	// TODO: DRY
 	number := strconv.FormatUint(withdrawal.OrderNumber, 10)
-	if len(number) < MinOrderNumberLength {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("The order number is too short"))
-		return nil
-	}
-	if err := goluhn.Validate(number); err != nil {
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		w.Write([]byte("Invalid order number: Luhn algorithm check failed"))
+	if err := validatePlainOrderNumber(w, number); err != nil {
 		return nil
 	}
 	withdrawal.UserID = userID
 	return &withdrawal
+}
+
+func validatePlainOrderNumber(w http.ResponseWriter, number string) error {
+	if len(number) < MinOrderNumberLength {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("The order number is too short"))
+		return errors.New("number is too short")
+	}
+	if err := goluhn.Validate(number); err != nil {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte("Invalid order number: Luhn algorithm check failed"))
+		return errors.New("non-Luhn order number")
+	}
+	return nil
 }
