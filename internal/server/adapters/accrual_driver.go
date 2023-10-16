@@ -8,37 +8,39 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/matthiasBT/gophermart/internal/infra/logging"
 	"github.com/matthiasBT/gophermart/internal/server/entities"
+	"golang.org/x/sync/semaphore"
 )
+
+const semaphoreWeight = 1
 
 type AccrualClient struct {
 	logger            logging.ILogger
 	baseURL           string
-	lock              *sync.Mutex
 	retryAfterDefault int
 	maxAttempts       int
+	lock              *semaphore.Weighted // a replacement for ctx-unaware sync.Mutex
 }
 
 func NewAccrualClient(logger logging.ILogger, url string, retryAfterDefault int, maxAttempts int) *AccrualClient {
 	return &AccrualClient{
 		logger:            logger,
 		baseURL:           url,
-		lock:              &sync.Mutex{},
 		retryAfterDefault: retryAfterDefault,
 		maxAttempts:       maxAttempts,
+		lock:              semaphore.NewWeighted(semaphoreWeight),
 	}
 }
 
 func (ac *AccrualClient) GetAccrual(ctx context.Context, orderNumber uint64) (*entities.AccrualResponse, error) {
 	ac.logger.Infof("Sending request for order accrual: %d", orderNumber)
-	if err := ac.Lock(ctx); err != nil {
-		return nil, errors.New("mutex locking was cancelled")
+	if err := ac.lock.Acquire(ctx, semaphoreWeight); err != nil {
+		return nil, errors.New("locking was cancelled")
 	}
-	defer ac.lock.Unlock()
+	defer ac.lock.Release(semaphoreWeight)
 	client := &http.Client{}
 	req, err := ac.constructRequest(ctx, orderNumber)
 	if err != nil {
@@ -85,29 +87,6 @@ func (ac *AccrualClient) constructRequest(ctx context.Context, orderNumber uint6
 	}
 	req = req.WithContext(ctx)
 	return req, nil
-}
-
-// TODO: refactor
-
-func (ac *AccrualClient) Lock(ctx context.Context) error {
-	lockAcquired := make(chan struct{})
-	go func() {
-		select {
-		case <-ctx.Done():
-			ac.logger.Infoln("Failed to acquire the lock: cancelled")
-			return
-		default:
-			ac.lock.Lock()
-			close(lockAcquired)
-		}
-	}()
-	select {
-	case <-lockAcquired:
-		ac.logger.Infoln("Lock acquired")
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 func (ac *AccrualClient) checkResponseCode(resp *http.Response) error {
