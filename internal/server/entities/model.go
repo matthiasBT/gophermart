@@ -36,14 +36,14 @@ type Order struct {
 	Accrual    float32   `db:"accrual" json:"accrual"`
 }
 
-func (o Order) MarshalJSON() ([]byte, error) {
+func (o *Order) MarshalJSON() ([]byte, error) {
 	type Alias Order
 	return json.Marshal(&struct {
 		UploadedAt string `json:"uploaded_at"`
 		*Alias
 	}{
 		UploadedAt: o.UploadedAt.Format(time.RFC3339),
-		Alias:      (*Alias)(&o),
+		Alias:      (*Alias)(o),
 	})
 }
 
@@ -73,9 +73,20 @@ type WithdrawalRequest struct {
 type Withdrawal struct {
 	ID          int       `db:"id"`
 	UserID      int       `db:"user_id"`
-	OrderNumber string    `db:"order_number"`
-	Amount      float32   `db:"amount"`
-	ProcessedAt time.Time `db:"processed_at"`
+	OrderNumber string    `db:"order_number" json:"order"`
+	Amount      float32   `db:"amount" json:"sum"`
+	ProcessedAt time.Time `db:"processed_at" json:"processed_at"`
+}
+
+func (w *Withdrawal) MarshalJSON() ([]byte, error) {
+	type Alias Withdrawal
+	return json.Marshal(&struct {
+		ProcessedAt string `json:"processed_at"`
+		*Alias
+	}{
+		ProcessedAt: w.ProcessedAt.Format(time.RFC3339),
+		Alias:       (*Alias)(w),
+	})
 }
 
 func (w *Withdrawal) UnmarshalJSON(data []byte) error {

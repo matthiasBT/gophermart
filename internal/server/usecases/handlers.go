@@ -216,16 +216,7 @@ func (c *BaseController) getWithdrawals(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	var result []map[string]any
-	for _, w := range withdrawals {
-		val := map[string]any{
-			"order":        w.OrderNumber,
-			"sum":          w.Amount,
-			"processed_at": w.ProcessedAt.Format(time.RFC3339),
-		}
-		result = append(result, val)
-	}
-	response, err := json.Marshal(result)
+	response, err := json.Marshal(withdrawals)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to marshal the result"))
@@ -257,7 +248,9 @@ func getUserID(w http.ResponseWriter, r *http.Request) *int {
 	return &res
 }
 
-func (c *BaseController) getAccrualFromService(w http.ResponseWriter, r *http.Request, order *entities.Order) *entities.Order {
+func (c *BaseController) getAccrualFromService(
+	w http.ResponseWriter, r *http.Request, order *entities.Order,
+) *entities.Order {
 	accrualResp, err := c.accrual.GetAccrual(r.Context(), order.Number)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
