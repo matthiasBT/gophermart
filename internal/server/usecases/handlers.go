@@ -21,8 +21,16 @@ func (c *BaseController) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	token := generateSessionToken()
-	_, session, err := c.stor.CreateUser(r.Context(), userReq.Login, pwdhash, token)
+	tx, err := c.stor.Tx(r.Context())
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to create user"))
+		return
+	}
+	defer tx.Commit()
+	user, err := c.stor.CreateUser(r.Context(), tx, userReq.Login, pwdhash)
+	if err != nil {
+		defer tx.Rollback()
 		if errors.Is(err, entities.ErrLoginAlreadyTaken) {
 			w.WriteHeader(http.StatusConflict)
 			w.Write([]byte("Login is already taken"))
@@ -30,6 +38,13 @@ func (c *BaseController) register(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("Failed to create a new user"))
 		}
+		return
+	}
+	session, err := c.stor.CreateSession(r.Context(), tx, user, token)
+	if err != nil {
+		defer tx.Rollback()
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to create a session"))
 		return
 	}
 	authorize(w, session)
@@ -57,7 +72,14 @@ func (c *BaseController) signIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	token := generateSessionToken()
-	session, err := c.stor.CreateSession(r.Context(), nil, user, token)
+	tx, err := c.stor.Tx(r.Context())
+	defer tx.Commit()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to create a user session"))
+		return
+	}
+	session, err := c.stor.CreateSession(r.Context(), tx, user, token)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to create a user session"))

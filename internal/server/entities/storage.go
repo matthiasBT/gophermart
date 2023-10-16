@@ -3,19 +3,24 @@ package entities
 import (
 	"context"
 	"errors"
-
-	"github.com/jmoiron/sqlx"
 )
 
 var (
 	ErrLoginAlreadyTaken = errors.New("login already taken")
 )
 
-type Storage interface {
-	CreateUser(ctx context.Context, login string, pwdhash []byte, sessionToken string) (*User, *Session, error)
-	FindUser(ctx context.Context, request *UserAuthRequest) (*User, error)
+type Tx interface {
+	Commit() error
+	Rollback() error
+	GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
+}
 
-	CreateSession(ctx context.Context, tx *sqlx.Tx, user *User, token string) (*Session, error)
+type Storage interface {
+	Tx(ctx context.Context) (Tx, error)
+
+	CreateUser(ctx context.Context, tx Tx, login string, pwdhash []byte) (*User, error)
+	FindUser(ctx context.Context, request *UserAuthRequest) (*User, error)
+	CreateSession(ctx context.Context, tx Tx, user *User, token string) (*Session, error)
 	FindSession(ctx context.Context, token string) (*Session, error)
 
 	CreateOrder(ctx context.Context, userID int, number uint64) (*Order, bool, error)

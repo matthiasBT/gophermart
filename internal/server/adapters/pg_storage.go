@@ -20,6 +20,22 @@ var txOpt = sql.TxOptions{
 	ReadOnly:  false,
 }
 
+type PGTx struct {
+	tx *sqlx.Tx
+}
+
+func (pgtx *PGTx) Commit() error {
+	return pgtx.tx.Commit()
+}
+
+func (pgtx *PGTx) Rollback() error {
+	return pgtx.tx.Rollback()
+}
+
+func (pgtx *PGTx) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	return pgtx.tx.GetContext(ctx, dest, query, args...)
+}
+
 type PGStorage struct {
 	logger logging.ILogger
 	db     *sqlx.DB
@@ -31,48 +47,29 @@ func NewPGStorage(logger logging.ILogger, db *sqlx.DB) *PGStorage {
 }
 
 func (st *PGStorage) CreateUser(
-	ctx context.Context, login string, pwdhash []byte, sessionToken string,
-) (*entities.User, *entities.Session, error) {
+	ctx context.Context, tx entities.Tx, login string, pwdhash []byte,
+) (*entities.User, error) {
 	st.logger.Infof("Creating a new user: %s", login)
 	var user = entities.User{}
-	tx, err := st.tx(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer tx.Commit()
 	query := "insert into users(login, password_hash) values ($1, $2) returning *"
-	err = tx.GetContext(ctx, &user, query, login, pwdhash)
-	if err != nil {
+	if err := tx.GetContext(ctx, &user, query, login, pwdhash); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 			st.logger.Infof("Login is already taken")
-			return nil, nil, entities.ErrLoginAlreadyTaken
+			return nil, entities.ErrLoginAlreadyTaken
 		}
 		st.logger.Errorf("Failed to create a user record: %s", err.Error())
-		return nil, nil, err
+		return nil, err
 	}
 	st.logger.Infof("User created: %s", login)
-	session, err := st.CreateSession(ctx, tx, &user, sessionToken)
-	if err != nil {
-		tx.Rollback()
-		return nil, nil, err
-	}
-	return &user, session, nil
+	return &user, nil
 }
 
 func (st *PGStorage) CreateSession(
-	ctx context.Context, tx *sqlx.Tx, user *entities.User, token string,
+	ctx context.Context, tx entities.Tx, user *entities.User, token string,
 ) (*entities.Session, error) {
 	st.logger.Infof("Creating a session for a user: %s", user.Login)
 	var session = entities.Session{}
-	if tx == nil {
-		trx, err := st.tx(ctx)
-		if err != nil {
-			return nil, err
-		}
-		tx = trx
-		defer tx.Commit()
-	}
 	query := "insert into sessions(user_id, token, expires_at) values ($1, $2, $3) returning *"
 	expiresAt := time.Now().Add(config.SessionTTL)
 	if err := tx.GetContext(ctx, &session, query, user.ID, token, expiresAt); err != nil {
@@ -247,11 +244,12 @@ func (st *PGStorage) FindUserWithdrawals(ctx context.Context, userID int) ([]ent
 	return withdrawals, nil
 }
 
-func (st *PGStorage) tx(ctx context.Context) (*sqlx.Tx, error) {
+func (st *PGStorage) Tx(ctx context.Context) (entities.Tx, error) {
 	tx, err := st.db.BeginTxx(ctx, &txOpt)
 	if err != nil {
 		st.logger.Errorf("Failed to open a transaction: %s", err.Error())
 		return nil, err
 	}
-	return tx, nil
+	trans := PGTx{tx: tx}
+	return &trans, nil
 }
