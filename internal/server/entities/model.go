@@ -30,10 +30,21 @@ type Session struct {
 type Order struct {
 	ID         int       `db:"id"`
 	UserID     int       `db:"user_id"`
-	Number     string    `db:"number"`
-	Status     string    `db:"status"`
-	UploadedAt time.Time `db:"uploaded_at"`
-	Accrual    float32   `db:"accrual"`
+	Number     string    `db:"number" json:"number"`
+	Status     string    `db:"status" json:"status"`
+	UploadedAt time.Time `db:"uploaded_at" json:"uploaded_at"`
+	Accrual    float32   `db:"accrual" json:"accrual"`
+}
+
+func (o Order) MarshalJSON() ([]byte, error) {
+	type Alias Order
+	return json.Marshal(&struct {
+		UploadedAt string `json:"uploaded_at"`
+		*Alias
+	}{
+		UploadedAt: o.UploadedAt.Format(time.RFC3339),
+		Alias:      (*Alias)(&o),
+	})
 }
 
 type Accrual struct {

@@ -130,7 +130,7 @@ func (c *BaseController) getOrders(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	var result []map[string]any
+	var result []*entities.Order
 	for _, order := range orders {
 		var orderData *entities.Order
 		if isFinalStatus(order.Status) { // if final status, get the already stored result
@@ -141,14 +141,7 @@ func (c *BaseController) getOrders(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		// TODO: refactor with custom marshal function
-		val := map[string]any{
-			"number":      order.Number,
-			"status":      orderData.Status,
-			"accrual":     orderData.Accrual,
-			"uploaded_at": orderData.UploadedAt.Format(time.RFC3339),
-		}
-		result = append(result, val)
+		result = append(result, orderData)
 	}
 	response, err := json.Marshal(result)
 	if err != nil {
