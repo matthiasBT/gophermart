@@ -35,7 +35,7 @@ func NewAccrualClient(logger logging.ILogger, url string, retryAfterDefault int,
 	}
 }
 
-func (ac *AccrualClient) GetAccrual(ctx context.Context, orderNumber uint64) (*entities.AccrualResponse, error) {
+func (ac *AccrualClient) GetAccrual(ctx context.Context, orderNumber string) (*entities.AccrualResponse, error) {
 	ac.logger.Infof("Sending request for order accrual: %d", orderNumber)
 	if err := ac.lock.Acquire(ctx, semaphoreWeight); err != nil {
 		return nil, errors.New("locking was cancelled")
@@ -78,8 +78,8 @@ func (ac *AccrualClient) GetAccrual(ctx context.Context, orderNumber uint64) (*e
 	return nil, errors.New("no accrual system response")
 }
 
-func (ac *AccrualClient) constructRequest(ctx context.Context, orderNumber uint64) (*http.Request, error) {
-	path := fmt.Sprintf("%s%s/%d", ac.baseURL, "/api/orders", orderNumber)
+func (ac *AccrualClient) constructRequest(ctx context.Context, orderNumber string) (*http.Request, error) {
+	path := fmt.Sprintf("%s%s/%s", ac.baseURL, "/api/orders", orderNumber)
 	req, err := http.NewRequest("GET", path, nil)
 	if err != nil {
 		ac.logger.Errorf("Failed to construct a request: %s", err.Error())

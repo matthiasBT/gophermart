@@ -112,7 +112,7 @@ func (st *PGStorage) FindSession(ctx context.Context, token string) (*entities.S
 	return &session, nil
 }
 
-func (st *PGStorage) CreateOrder(ctx context.Context, userID int, number uint64) (*entities.Order, bool, error) {
+func (st *PGStorage) CreateOrder(ctx context.Context, userID int, number string) (*entities.Order, bool, error) {
 	st.logger.Infof("Creating order %d for user %d", number, userID)
 	order, err := st.FindOrder(ctx, number)
 	if err != nil {
@@ -131,7 +131,7 @@ func (st *PGStorage) CreateOrder(ctx context.Context, userID int, number uint64)
 	return &result, false, nil
 }
 
-func (st *PGStorage) FindOrder(ctx context.Context, number uint64) (*entities.Order, error) {
+func (st *PGStorage) FindOrder(ctx context.Context, number string) (*entities.Order, error) {
 	st.logger.Infof("Searching for an order: %d", number)
 	var order = entities.Order{}
 	query := "select * from orders where number = $1"

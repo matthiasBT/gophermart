@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/matthiasBT/gophermart/internal/infra/config"
@@ -133,49 +132,21 @@ func (c *BaseController) getOrders(w http.ResponseWriter, r *http.Request) {
 	}
 	var result []map[string]any
 	for _, order := range orders {
-		var number string
-		var status string
-		var amount float32
-
-		if order.Status == "INVALID" || order.Status == "PROCESSED" {
-			number = strconv.FormatUint(order.Number, 10)
-			status = order.Status
-			amount = order.Accrual
+		var orderData *entities.Order
+		if isFinalStatus(order.Status) { // if final status, get the already stored result
+			orderData = &order
 		} else {
-			accrualResp, err := c.accrual.GetAccrual(r.Context(), order.Number)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("Failed to get data from accrual system"))
+			orderData = c.getAccrualFromService(w, r, &order)
+			if orderData == nil {
 				return
 			}
-			if accrualResp == nil {
-				accrualResp = &entities.AccrualResponse{
-					OrderNumber: strconv.FormatUint(order.Number, 10), // todo: custom marshalling?
-					Status:      order.Status,
-					Amount:      0.0,
-				}
-			} else if accrualResp.Status == "INVALID" || accrualResp.Status == "PROCESSED" {
-				accr := entities.Accrual{
-					UserID:  *userID,
-					OrderID: order.ID,
-					Amount:  accrualResp.Amount,
-				}
-				if err := c.stor.CreateAccrual(r.Context(), &accr); err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					w.Write([]byte("Failed to store accrual response in the db"))
-					return
-				}
-			}
-			number = accrualResp.OrderNumber
-			status = accrualResp.Status
-			amount = accrualResp.Amount
 		}
 		// TODO: refactor with custom marshal function
 		val := map[string]any{
-			"number":      number,
-			"status":      status,
-			"accrual":     amount,
-			"uploaded_at": order.UploadedAt.Format(time.RFC3339),
+			"number":      order.Number,
+			"status":      orderData.Status,
+			"accrual":     orderData.Accrual,
+			"uploaded_at": orderData.UploadedAt.Format(time.RFC3339),
 		}
 		result = append(result, val)
 	}
@@ -255,7 +226,7 @@ func (c *BaseController) getWithdrawals(w http.ResponseWriter, r *http.Request) 
 	var result []map[string]any
 	for _, w := range withdrawals {
 		val := map[string]any{
-			"order":        strconv.FormatUint(w.OrderNumber, 10),
+			"order":        w.OrderNumber,
 			"sum":          w.Amount,
 			"processed_at": w.ProcessedAt.Format(time.RFC3339),
 		}
@@ -291,4 +262,41 @@ func getUserID(w http.ResponseWriter, r *http.Request) *int {
 	}
 	res := userID.(int)
 	return &res
+}
+
+func (c *BaseController) getAccrualFromService(w http.ResponseWriter, r *http.Request, order *entities.Order) *entities.Order {
+	accrualResp, err := c.accrual.GetAccrual(r.Context(), order.Number)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to get data from accrual system"))
+		return nil
+	}
+	if accrualResp == nil {
+		accrualResp = &entities.AccrualResponse{
+			OrderNumber: order.Number,
+			Status:      order.Status,
+			Amount:      0.0,
+		}
+	} else if isFinalStatus(accrualResp.Status) { // if final status, store the result
+		accr := entities.Accrual{
+			UserID:  *getUserID(w, r),
+			OrderID: order.ID,
+			Amount:  accrualResp.Amount,
+		}
+		if err := c.stor.CreateAccrual(r.Context(), &accr); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Failed to store accrual response in the db"))
+			return nil
+		}
+	}
+	return &entities.Order{
+		Number:     accrualResp.OrderNumber,
+		Status:     accrualResp.Status,
+		Accrual:    accrualResp.Amount,
+		UploadedAt: order.UploadedAt,
+	}
+}
+
+func isFinalStatus(status string) bool {
+	return status == "INVALID" || status == "PROCESSED"
 }

@@ -23,8 +23,8 @@ type Storage interface {
 	CreateSession(ctx context.Context, tx Tx, user *User, token string) (*Session, error)
 	FindSession(ctx context.Context, token string) (*Session, error)
 
-	CreateOrder(ctx context.Context, userID int, number uint64) (*Order, bool, error)
-	FindOrder(ctx context.Context, number uint64) (*Order, error)
+	CreateOrder(ctx context.Context, userID int, number string) (*Order, bool, error)
+	FindOrder(ctx context.Context, number string) (*Order, error)
 	FindUserOrders(ctx context.Context, userID int) ([]Order, error)
 
 	CreateAccrual(ctx context.Context, accrual *Accrual) error

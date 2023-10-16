@@ -2,7 +2,6 @@ package entities
 
 import (
 	"encoding/json"
-	"strconv"
 	"time"
 )
 
@@ -31,7 +30,7 @@ type Session struct {
 type Order struct {
 	ID         int       `db:"id"`
 	UserID     int       `db:"user_id"`
-	Number     uint64    `db:"number"`
+	Number     string    `db:"number"`
 	Status     string    `db:"status"`
 	UploadedAt time.Time `db:"uploaded_at"`
 	Accrual    float32   `db:"accrual"`
@@ -63,7 +62,7 @@ type WithdrawalRequest struct {
 type Withdrawal struct {
 	ID          int       `db:"id"`
 	UserID      int       `db:"user_id"`
-	OrderNumber uint64    `db:"order_number"`
+	OrderNumber string    `db:"order_number"`
 	Amount      float32   `db:"amount"`
 	ProcessedAt time.Time `db:"processed_at"`
 }
@@ -73,11 +72,7 @@ func (w *Withdrawal) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, req); err != nil {
 		return err
 	}
-	number, err := strconv.ParseUint(req.Number, 10, 64)
-	if err != nil {
-		return err
-	}
-	w.OrderNumber = number
+	w.OrderNumber = req.Number
 	w.Amount = req.Sum
 	return nil
 }

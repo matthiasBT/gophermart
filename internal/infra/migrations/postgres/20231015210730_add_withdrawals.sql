@@ -3,7 +3,7 @@
 create table withdrawals(
     id integer primary key generated always as identity,
     user_id integer references users(id) not null,
-    order_number numeric(20, 0),
+    order_number text not null,
     amount float not null,
     processed_at timestamptz not null
 );

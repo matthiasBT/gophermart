@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/ShiraazMoollatjie/goluhn"
 	"github.com/matthiasBT/gophermart/internal/server/entities"
@@ -41,7 +40,7 @@ func validateUserAuthReq(w http.ResponseWriter, r *http.Request) *entities.UserA
 	return &userReq
 }
 
-func validateOrderNumber(w http.ResponseWriter, r *http.Request) *uint64 {
+func validateOrderNumber(w http.ResponseWriter, r *http.Request) *string {
 	if r.Header.Get("Content-Type") != "text/plain" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Supply data as plaintext"))
@@ -57,8 +56,7 @@ func validateOrderNumber(w http.ResponseWriter, r *http.Request) *uint64 {
 	if err := validatePlainOrderNumber(w, number); err != nil {
 		return nil
 	}
-	res, _ := strconv.ParseUint(number, 10, 64)
-	return &res
+	return &number
 }
 
 func validateWithdrawal(w http.ResponseWriter, r *http.Request, userID int) *entities.Withdrawal {
@@ -79,8 +77,7 @@ func validateWithdrawal(w http.ResponseWriter, r *http.Request, userID int) *ent
 		w.Write([]byte("Failed to parse withdrawal request"))
 		return nil
 	}
-	number := strconv.FormatUint(withdrawal.OrderNumber, 10)
-	if err := validatePlainOrderNumber(w, number); err != nil {
+	if err := validatePlainOrderNumber(w, withdrawal.OrderNumber); err != nil {
 		return nil
 	}
 	withdrawal.UserID = userID
