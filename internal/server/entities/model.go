@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"database/sql"
 	"encoding/json"
 	"time"
 )
@@ -48,10 +49,39 @@ func (o *Order) MarshalJSON() ([]byte, error) {
 }
 
 type Accrual struct {
-	ID      int     `db:"id"`
-	UserID  int     `db:"user_id"`
-	OrderID int     `db:"order_id"`
-	Amount  float32 `db:"amount"`
+	ID          int          `db:"id"`
+	UserID      int          `db:"user_id"`
+	OrderNumber string       `db:"order_number" json:"order"`
+	Amount      float32      `db:"amount" json:"sum"`
+	ProcessedAt sql.NullTime `db:"processed_at" json:"processed_at"`
+}
+
+func (a *Accrual) MarshalJSON() ([]byte, error) {
+	var processedAt *string
+	if a.ProcessedAt.Valid {
+		formatted := a.ProcessedAt.Time.Format(time.RFC3339)
+		processedAt = &formatted
+	}
+
+	type Alias Accrual
+	data := &struct {
+		ProcessedAt *string `json:"processed_at"`
+		*Alias
+	}{
+		ProcessedAt: processedAt,
+		Alias:       (*Alias)(a),
+	}
+	return json.Marshal(data)
+}
+
+func (a *Accrual) UnmarshalJSON(data []byte) error {
+	req := &WithdrawalRequest{}
+	if err := json.Unmarshal(data, req); err != nil {
+		return err
+	}
+	a.OrderNumber = req.Number
+	a.Amount = req.Sum
+	return nil
 }
 
 type AccrualResponse struct {
@@ -68,33 +98,4 @@ type Balance struct {
 type WithdrawalRequest struct {
 	Number string  `json:"order"`
 	Sum    float32 `json:"sum"`
-}
-
-type Withdrawal struct {
-	ID          int       `db:"id"`
-	UserID      int       `db:"user_id"`
-	OrderNumber string    `db:"order_number" json:"order"`
-	Amount      float32   `db:"amount" json:"sum"`
-	ProcessedAt time.Time `db:"processed_at" json:"processed_at"`
-}
-
-func (w *Withdrawal) MarshalJSON() ([]byte, error) {
-	type Alias Withdrawal
-	return json.Marshal(&struct {
-		ProcessedAt string `json:"processed_at"`
-		*Alias
-	}{
-		ProcessedAt: w.ProcessedAt.Format(time.RFC3339),
-		Alias:       (*Alias)(w),
-	})
-}
-
-func (w *Withdrawal) UnmarshalJSON(data []byte) error {
-	req := &WithdrawalRequest{}
-	if err := json.Unmarshal(data, req); err != nil {
-		return err
-	}
-	w.OrderNumber = req.Number
-	w.Amount = req.Sum
-	return nil
 }

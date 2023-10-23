@@ -59,13 +59,13 @@ func validateOrderNumber(w http.ResponseWriter, r *http.Request) *string {
 	return &number
 }
 
-func validateWithdrawal(w http.ResponseWriter, r *http.Request, userID int) *entities.Withdrawal {
+func validateWithdrawal(w http.ResponseWriter, r *http.Request, userID int) *entities.Accrual {
 	if r.Header.Get("Content-Type") != "application/json" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Supply data as JSON"))
 		return nil
 	}
-	var withdrawal entities.Withdrawal
+	var withdrawal entities.Accrual
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -78,6 +78,11 @@ func validateWithdrawal(w http.ResponseWriter, r *http.Request, userID int) *ent
 		return nil
 	}
 	if err := validatePlainOrderNumber(w, withdrawal.OrderNumber); err != nil {
+		return nil
+	}
+	if withdrawal.Amount < 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Failed to parse negative withdrawal request"))
 		return nil
 	}
 	withdrawal.UserID = userID

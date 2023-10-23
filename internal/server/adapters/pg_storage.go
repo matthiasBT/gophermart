@@ -160,7 +160,7 @@ func (st *PGStorage) FindUserOrders(ctx context.Context, userID int) ([]entities
 	query := `
 		select o.*, coalesce(a.amount, 0) as "accrual"
 		from orders o
-		left join accruals a on o.id = a.order_id
+		left join accruals a on o.number = a.order_number
 		where o.user_id = $1
 		order by uploaded_at
 	`
@@ -178,10 +178,10 @@ func (st *PGStorage) FindUserOrders(ctx context.Context, userID int) ([]entities
 
 func (st *PGStorage) CreateAccrual(ctx context.Context, accrual *entities.Accrual) error {
 	st.logger.Infof(
-		"Creating accrual. User: %d, order: %d, amount: %f", accrual.UserID, accrual.OrderID, accrual.Amount,
+		"Creating accrual. User: %d, order: %d, amount: %f", accrual.UserID, accrual.OrderNumber, accrual.Amount,
 	)
-	query := "insert into accruals(user_id, order_id, amount) values ($1, $2, $3)"
-	if _, err := st.db.ExecContext(ctx, query, accrual.UserID, accrual.OrderID, accrual.Amount); err != nil {
+	query := "insert into accruals(user_id, order_number, amount) values ($1, $2, $3)"
+	if _, err := st.db.ExecContext(ctx, query, accrual.UserID, accrual.OrderNumber, accrual.Amount); err != nil {
 		st.logger.Errorf("Failed to create accrual: %s", err.Error())
 		return err
 	}
@@ -193,18 +193,14 @@ func (st *PGStorage) GetBalance(ctx context.Context, userID int) (*entities.Bala
 	st.logger.Infof("Calculating user balance: %d", userID)
 	var balance = entities.Balance{}
 	query := `
-		with accruals as (
-			select coalesce(sum(a.amount), 0.0) as amount
+		with user_accr as (
+			select a.amount
 			from accruals a
 			where a.user_id = $1
-		), withdrawals as (
-			select coalesce(sum(w.amount), 0.0) as amount
-			from withdrawals w
-			where w.user_id = $1
 		)
 		select
-			(select amount from accruals) - (select amount from withdrawals) as current,
-			(select amount from withdrawals) as withdrawn
+			(select coalesce(sum(amount), 0.0) from user_accr) current,
+			(select -1 * coalesce(sum(amount), 0.0) from user_accr where amount < 0) withdrawn
 	`
 	if err := st.db.GetContext(ctx, &balance, query, userID); err != nil {
 		st.logger.Errorf("Failed to calculate balance: %s", err.Error())
@@ -215,18 +211,18 @@ func (st *PGStorage) GetBalance(ctx context.Context, userID int) (*entities.Bala
 }
 
 func (st *PGStorage) CreateWithdrawal(
-	ctx context.Context, withdrawal *entities.Withdrawal,
-) (*entities.Withdrawal, error) {
+	ctx context.Context, withdrawal *entities.Accrual,
+) (*entities.Accrual, error) {
 	st.logger.Infof(
 		"Creating withdrawal for user: %d, order: %d, amount: %f",
 		withdrawal.UserID,
 		withdrawal.OrderNumber,
 		withdrawal.Amount,
 	)
-	query := "insert into withdrawals(user_id, order_number, amount, processed_at) values ($1, $2, $3, $4) returning *"
-	var res = entities.Withdrawal{}
+	query := "insert into accruals(user_id, order_number, amount, processed_at) values ($1, $2, $3, $4) returning *"
+	var res = entities.Accrual{}
 	if err := st.db.GetContext(
-		ctx, &res, query, withdrawal.UserID, withdrawal.OrderNumber, withdrawal.Amount, time.Now(),
+		ctx, &res, query, withdrawal.UserID, withdrawal.OrderNumber, -withdrawal.Amount, time.Now(),
 	); err != nil {
 		st.logger.Errorf("Failed to create withdrawal: %s", err.Error())
 		return nil, err
@@ -235,10 +231,16 @@ func (st *PGStorage) CreateWithdrawal(
 	return &res, nil
 }
 
-func (st *PGStorage) FindUserWithdrawals(ctx context.Context, userID int) ([]entities.Withdrawal, error) {
+func (st *PGStorage) FindUserWithdrawals(ctx context.Context, userID int) ([]entities.Accrual, error) {
 	st.logger.Infof("Getting user withdrawals: %d", userID)
-	var withdrawals []entities.Withdrawal
-	query := `select * from withdrawals where user_id = $1 order by processed_at`
+	var withdrawals []entities.Accrual
+	query := `
+		select id, user_id, order_number, processed_at, -1 * amount as amount
+		from accruals
+		where user_id = $1
+		and amount < 0
+		order by processed_at
+	`
 	if err := st.db.SelectContext(ctx, &withdrawals, query, userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			st.logger.Infoln("Withdrawals not found")

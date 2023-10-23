@@ -265,9 +265,9 @@ func (c *BaseController) getAccrualFromService(
 		}
 	} else if isFinalStatus(accrualResp.Status) { // if final status, store the result
 		accr := entities.Accrual{
-			UserID:  *getUserID(w, r),
-			OrderID: order.ID,
-			Amount:  accrualResp.Amount,
+			UserID:      *getUserID(w, r),
+			OrderNumber: order.Number,
+			Amount:      accrualResp.Amount,
 		}
 		if err := c.stor.CreateAccrual(r.Context(), &accr); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
