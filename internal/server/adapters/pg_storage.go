@@ -36,6 +36,11 @@ func (pgtx *PGTx) GetContext(ctx context.Context, dest interface{}, query string
 	return pgtx.tx.GetContext(ctx, dest, query, args...)
 }
 
+func (pgtx *PGTx) ExecContext(ctx context.Context, query string, args ...any) error {
+	_, err := pgtx.tx.ExecContext(ctx, query, args...)
+	return err
+}
+
 type PGStorage struct {
 	logger logging.ILogger
 	db     *sqlx.DB
@@ -120,7 +125,7 @@ func (st *PGStorage) FindSession(ctx context.Context, token string) (*entities.S
 }
 
 func (st *PGStorage) CreateOrder(ctx context.Context, userID int, number string) (*entities.Order, bool, error) {
-	st.logger.Infof("Creating order %d for user %d", number, userID)
+	st.logger.Infof("Creating order %s for user %d", number, userID)
 	order, err := st.FindOrder(ctx, number)
 	if err != nil {
 		return nil, false, err
@@ -176,13 +181,18 @@ func (st *PGStorage) FindUserOrders(ctx context.Context, userID int) ([]entities
 	return orders, nil
 }
 
-func (st *PGStorage) CreateAccrual(ctx context.Context, accrual *entities.Accrual) error {
+func (st *PGStorage) CreateAccrual(ctx context.Context, tx entities.Tx, userID int, accrual *entities.AccrualResponse) error {
 	st.logger.Infof(
-		"Creating accrual. User: %d, order: %d, amount: %f", accrual.UserID, accrual.OrderNumber, accrual.Amount,
+		"Creating accrual. User: %d, order: %d, amount: %f", userID, accrual.OrderNumber, accrual.Amount,
 	)
-	query := "insert into accruals(user_id, order_number, amount) values ($1, $2, $3)"
-	if _, err := st.db.ExecContext(ctx, query, accrual.UserID, accrual.OrderNumber, accrual.Amount); err != nil {
-		st.logger.Errorf("Failed to create accrual: %s", err.Error())
+	query := `
+		insert into accruals(user_id, order_number, amount)
+		values ($1, $2, $3)
+		on conflict (user_id, order_number) where processed_at is null
+		do update set amount = EXCLUDED.amount
+	`
+	if err := tx.ExecContext(ctx, query, userID, accrual.OrderNumber, accrual.Amount); err != nil {
+		st.logger.Errorf("Failed to create accrual: %v", err)
 		return err
 	}
 	st.logger.Infof("Accrual created!")
@@ -261,4 +271,37 @@ func (st *PGStorage) Tx(ctx context.Context) (entities.Tx, error) {
 	}
 	trans := PGTx{tx: tx}
 	return &trans, nil
+}
+
+func (st *PGStorage) FetchUnprocessedOrders(ctx context.Context, limit int) ([]entities.Order, error) {
+	st.logger.Infof("Getting %d unprocessed orders", limit)
+	var orders []entities.Order
+	query := `
+		select *
+		from orders
+		where status not in ('INVALID', 'PROCESSED')
+		order by id
+		limit $1
+	`
+	if err := st.db.SelectContext(ctx, &orders, query, limit); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			st.logger.Infoln("Orders not found")
+			return nil, nil
+		}
+		st.logger.Errorf("Failed to find the orders: %v", err)
+		return nil, err
+	}
+	st.logger.Infoln("Unprocessed orders found")
+	return orders, nil
+}
+
+func (st *PGStorage) UpdateOrderStatus(ctx context.Context, tx entities.Tx, number string, status string) error {
+	st.logger.Infof("Updating order %s status: %s", number, status)
+	query := "update orders set status = $1 where number = $2"
+	if err := tx.ExecContext(ctx, query, status, number); err != nil {
+		st.logger.Errorf("Failed to update order: %v", err)
+		return err
+	}
+	st.logger.Infof("Order status updated!")
+	return nil
 }

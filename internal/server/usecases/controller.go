@@ -7,18 +7,16 @@ import (
 )
 
 type BaseController struct {
-	logger  logging.ILogger
-	stor    entities.Storage
-	crypto  entities.ICryptoProvider
-	accrual entities.IAccrualClient
+	logger logging.ILogger
+	stor   entities.Storage
+	crypto entities.ICryptoProvider
 }
 
-func NewBaseController(logger logging.ILogger, stor entities.Storage, crypto entities.ICryptoProvider, accrual entities.IAccrualClient) *BaseController {
+func NewBaseController(logger logging.ILogger, stor entities.Storage, crypto entities.ICryptoProvider) *BaseController {
 	return &BaseController{
-		logger:  logger,
-		stor:    stor,
-		crypto:  crypto,
-		accrual: accrual,
+		logger: logger,
+		stor:   stor,
+		crypto: crypto,
 	}
 }
 

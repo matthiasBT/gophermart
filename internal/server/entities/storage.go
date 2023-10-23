@@ -13,6 +13,7 @@ type Tx interface {
 	Commit() error
 	Rollback() error
 	GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
+	ExecContext(ctx context.Context, query string, args ...any) error
 }
 
 type Storage interface {
@@ -27,8 +28,11 @@ type Storage interface {
 	FindOrder(ctx context.Context, number string) (*Order, error)
 	FindUserOrders(ctx context.Context, userID int) ([]Order, error)
 
-	CreateAccrual(ctx context.Context, accrual *Accrual) error
 	GetBalance(ctx context.Context, userID int) (*Balance, error)
 	CreateWithdrawal(ctx context.Context, withdrawal *Accrual) (*Accrual, error)
 	FindUserWithdrawals(ctx context.Context, userID int) ([]Accrual, error)
+
+	FetchUnprocessedOrders(ctx context.Context, limit int) ([]Order, error)
+	CreateAccrual(ctx context.Context, tx Tx, userID int, accrual *AccrualResponse) error
+	UpdateOrderStatus(ctx context.Context, tx Tx, number string, status string) error
 }

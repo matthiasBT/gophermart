@@ -74,12 +74,14 @@ func (c *BaseController) signIn(w http.ResponseWriter, r *http.Request) {
 	tx, err := c.stor.Tx(r.Context())
 	defer tx.Commit()
 	if err != nil {
+		defer tx.Rollback()
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to create a user session"))
 		return
 	}
 	session, err := c.stor.CreateSession(r.Context(), tx, user, token)
 	if err != nil {
+		defer tx.Rollback()
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to create a user session"))
 		return
@@ -130,20 +132,7 @@ func (c *BaseController) getOrders(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	var result []*entities.Order
-	for _, order := range orders {
-		var orderData *entities.Order
-		if isFinalStatus(order.Status) { // if final status, get the already stored result
-			orderData = &order
-		} else {
-			orderData = c.getAccrualFromService(w, r, &order)
-			if orderData == nil {
-				return
-			}
-		}
-		result = append(result, orderData)
-	}
-	response, err := json.Marshal(result)
+	response, err := json.Marshal(orders)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to marshal the result"))
@@ -246,41 +235,6 @@ func getUserID(w http.ResponseWriter, r *http.Request) *int {
 	}
 	res := userID.(int)
 	return &res
-}
-
-func (c *BaseController) getAccrualFromService(
-	w http.ResponseWriter, r *http.Request, order *entities.Order,
-) *entities.Order {
-	accrualResp, err := c.accrual.GetAccrual(r.Context(), order.Number)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Failed to get data from accrual system"))
-		return nil
-	}
-	if accrualResp == nil {
-		accrualResp = &entities.AccrualResponse{
-			OrderNumber: order.Number,
-			Status:      order.Status,
-			Amount:      0.0,
-		}
-	} else if isFinalStatus(accrualResp.Status) { // if final status, store the result
-		accr := entities.Accrual{
-			UserID:      *getUserID(w, r),
-			OrderNumber: order.Number,
-			Amount:      accrualResp.Amount,
-		}
-		if err := c.stor.CreateAccrual(r.Context(), &accr); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Failed to store accrual response in the db"))
-			return nil
-		}
-	}
-	return &entities.Order{
-		Number:     accrualResp.OrderNumber,
-		Status:     accrualResp.Status,
-		Accrual:    accrualResp.Amount,
-		UploadedAt: order.UploadedAt,
-	}
 }
 
 func isFinalStatus(status string) bool {

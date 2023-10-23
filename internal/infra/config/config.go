@@ -11,6 +11,10 @@ const SessionTTL = 1 * time.Hour
 const MaxAccrualRequestAttempts = 5
 const DefaultAccrualRequestTimeoutSec = 10
 
+const WorkerPoolSize = 3
+const WorkerJobsCapacity = 100
+const WorkerInterval = 15 * time.Second
+
 type Config struct {
 	ServerAddr  string `env:"RUN_ADDRESS"`
 	DatabaseDSN string `env:"DATABASE_URI"`

@@ -31,7 +31,7 @@ func NewAccrualClient(logger logging.ILogger, url string, retryAfterDefault int,
 }
 
 func (ac *AccrualClient) GetAccrual(ctx context.Context, orderNumber string) (*entities.AccrualResponse, error) {
-	ac.logger.Infof("Sending request for order accrual: %d", orderNumber)
+	ac.logger.Infof("Sending request for order accrual: %s", orderNumber)
 	client := &http.Client{}
 	req, err := ac.constructRequest(ctx, orderNumber)
 	if err != nil {
