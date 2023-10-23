@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/jmoiron/sqlx"
 	"github.com/matthiasBT/gophermart/internal/infra/auth"
 	"github.com/matthiasBT/gophermart/internal/infra/config"
 	"github.com/matthiasBT/gophermart/internal/infra/logging"
@@ -29,9 +28,8 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
-	db := sqlx.MustOpen("pgx", conf.DatabaseDSN)
-	defer db.Close()
-	storage := adapters.NewPGStorage(logger, db)
+	storage := adapters.NewPGStorage(logger, conf.DatabaseDSN)
+	defer storage.Shutdown()
 	crypto := adapters.CryptoProvider{Logger: logger}
 	accrualDriver := adapters.NewAccrualClient(
 		logger, conf.AccrualAddr, config.DefaultAccrualRequestTimeoutSec, config.MaxAccrualRequestAttempts,

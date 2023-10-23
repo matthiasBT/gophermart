@@ -41,9 +41,16 @@ type PGStorage struct {
 	db     *sqlx.DB
 }
 
-func NewPGStorage(logger logging.ILogger, db *sqlx.DB) *PGStorage {
+func NewPGStorage(logger logging.ILogger, dsn string) *PGStorage {
+	db := sqlx.MustOpen("pgx", dsn)
 	migrations.Migrate(db)
 	return &PGStorage{logger: logger, db: db}
+}
+
+func (st *PGStorage) Shutdown() {
+	if err := st.db.Close(); err != nil {
+		st.logger.Errorf("Failed to cleanup the DB resources: %v", err)
+	}
 }
 
 func (st *PGStorage) CreateUser(
