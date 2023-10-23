@@ -12,17 +12,13 @@ import (
 
 	"github.com/matthiasBT/gophermart/internal/infra/logging"
 	"github.com/matthiasBT/gophermart/internal/server/entities"
-	"golang.org/x/sync/semaphore"
 )
-
-const semaphoreWeight = 1
 
 type AccrualClient struct {
 	logger            logging.ILogger
 	baseURL           string
 	retryAfterDefault int
 	maxAttempts       int
-	lock              *semaphore.Weighted // a replacement for ctx-unaware sync.Mutex
 }
 
 func NewAccrualClient(logger logging.ILogger, url string, retryAfterDefault int, maxAttempts int) *AccrualClient {
@@ -31,16 +27,11 @@ func NewAccrualClient(logger logging.ILogger, url string, retryAfterDefault int,
 		baseURL:           url,
 		retryAfterDefault: retryAfterDefault,
 		maxAttempts:       maxAttempts,
-		lock:              semaphore.NewWeighted(semaphoreWeight),
 	}
 }
 
 func (ac *AccrualClient) GetAccrual(ctx context.Context, orderNumber string) (*entities.AccrualResponse, error) {
 	ac.logger.Infof("Sending request for order accrual: %d", orderNumber)
-	if err := ac.lock.Acquire(ctx, semaphoreWeight); err != nil {
-		return nil, errors.New("locking was cancelled")
-	}
-	defer ac.lock.Release(semaphoreWeight)
 	client := &http.Client{}
 	req, err := ac.constructRequest(ctx, orderNumber)
 	if err != nil {
