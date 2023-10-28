@@ -9,29 +9,35 @@ import (
 )
 
 type Collector struct {
-	name    string
-	client  entities.IAccrualClient
-	storage entities.Storage
-	logger  logging.ILogger
-	jobs    <-chan entities.Job
-	done    <-chan struct{}
+	name        string
+	client      entities.IAccrualClient
+	storage     entities.Storage
+	orderRepo   entities.OrderRepo
+	accrualRepo entities.AccrualRepo
+	logger      logging.ILogger
+	jobs        <-chan entities.Job
+	done        <-chan struct{}
 }
 
 func NewCollector(
 	name string,
 	client entities.IAccrualClient,
 	storage entities.Storage,
+	orderRepo entities.OrderRepo,
+	accrualRepo entities.AccrualRepo,
 	logger logging.ILogger,
 	jobs <-chan entities.Job,
 	done <-chan struct{},
 ) *Collector {
 	return &Collector{
-		name:    name,
-		client:  client,
-		storage: storage,
-		logger:  logger,
-		jobs:    jobs,
-		done:    done,
+		name:        name,
+		client:      client,
+		storage:     storage,
+		orderRepo:   orderRepo,
+		accrualRepo: accrualRepo,
+		logger:      logger,
+		jobs:        jobs,
+		done:        done,
 	}
 }
 
@@ -52,7 +58,7 @@ func (c *Collector) Run(ctx context.Context) {
 }
 
 func (c *Collector) collect(ctx context.Context, job *entities.Job) error {
-	if order, err := c.storage.FindOrder(ctx, job.OrderNumber); err != nil {
+	if order, err := c.orderRepo.FindOrder(ctx, job.OrderNumber); err != nil {
 		return err
 	} else if order.Status == "INVALID" || order.Status == "PROCESSED" {
 		c.logger.Infof("Order %s was already fetched from the accrual service")
@@ -67,11 +73,11 @@ func (c *Collector) collect(ctx context.Context, job *entities.Job) error {
 		return err
 	}
 	defer tx.Commit()
-	if err := c.storage.CreateAccrual(ctx, tx, job.UserID, resp); err != nil {
+	if err := c.accrualRepo.CreateAccrual(ctx, tx, job.UserID, resp); err != nil {
 		defer tx.Rollback()
 		return err
 	}
-	if err := c.storage.UpdateOrderStatus(ctx, tx, job.OrderNumber, resp.Status); err != nil {
+	if err := c.orderRepo.UpdateOrderStatus(ctx, tx, job.OrderNumber, resp.Status); err != nil {
 		defer tx.Rollback()
 		return err
 	}
@@ -80,6 +86,7 @@ func (c *Collector) collect(ctx context.Context, job *entities.Job) error {
 
 type Supplier struct {
 	storage   entities.Storage
+	orderRepo entities.OrderRepo
 	logger    logging.ILogger
 	jobs      chan<- entities.Job
 	done      <-chan struct{}
@@ -89,6 +96,7 @@ type Supplier struct {
 
 func NewSupplier(
 	storage entities.Storage,
+	orderRepo entities.OrderRepo,
 	logger logging.ILogger,
 	jobs chan<- entities.Job,
 	done <-chan struct{},
@@ -97,6 +105,7 @@ func NewSupplier(
 ) *Supplier {
 	return &Supplier{
 		storage:   storage,
+		orderRepo: orderRepo,
 		logger:    logger,
 		jobs:      jobs,
 		done:      done,
@@ -121,7 +130,7 @@ func (s *Supplier) Run(ctx context.Context) {
 }
 
 func (s *Supplier) supply(ctx context.Context) error {
-	orders, err := s.storage.FetchUnprocessedOrders(ctx, s.batchSize)
+	orders, err := s.orderRepo.FetchUnprocessedOrders(ctx, s.batchSize)
 	if err != nil {
 		return err
 	}

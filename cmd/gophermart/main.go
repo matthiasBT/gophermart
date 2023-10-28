@@ -17,14 +17,15 @@ import (
 	"github.com/matthiasBT/gophermart/internal/infra/config"
 	"github.com/matthiasBT/gophermart/internal/infra/logging"
 	"github.com/matthiasBT/gophermart/internal/server/adapters"
+	"github.com/matthiasBT/gophermart/internal/server/adapters/repositories"
 	"github.com/matthiasBT/gophermart/internal/server/entities"
 	"github.com/matthiasBT/gophermart/internal/server/usecases"
 )
 
-func setupServer(logger logging.ILogger, storage entities.Storage, controller *usecases.BaseController) *chi.Mux {
+func setupServer(logger logging.ILogger, userRepo entities.UserRepo, controller *usecases.BaseController) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(logging.Middleware(logger))
-	r.Use(auth.Middleware(logger, storage))
+	r.Use(auth.Middleware(logger, userRepo))
 	r.Mount("/api", controller.Route())
 	return r
 }
@@ -50,15 +51,18 @@ func main() {
 	}
 	storage := adapters.NewPGStorage(logger, conf.DatabaseDSN)
 	defer storage.Shutdown()
+	userRepo := repositories.NewPGUserRepo(logger, storage)
+	orderRepo := repositories.NewPGOrderRepo(logger, storage)
+	accrualRepo := repositories.NewPGAccrualRepo(logger, storage)
 	crypto := adapters.CryptoProvider{Logger: logger}
-	controller := usecases.NewBaseController(logger, storage, &crypto)
-	r := setupServer(logger, storage, controller)
+	controller := usecases.NewBaseController(logger, storage, userRepo, orderRepo, accrualRepo, &crypto)
+	r := setupServer(logger, userRepo, controller)
 	srv := http.Server{Addr: conf.ServerAddr, Handler: r}
 
 	done := make(chan struct{}, 1)
 	jobs := make(chan entities.Job, config.WorkerJobsCapacity)
 	supplier := adapters.NewSupplier(
-		storage, logger, jobs, done, time.NewTicker(config.WorkerInterval).C, config.WorkerJobsCapacity,
+		storage, orderRepo, logger, jobs, done, time.NewTicker(config.WorkerInterval).C, config.WorkerJobsCapacity,
 	)
 	ctx := context.Background()
 	go supplier.Run(ctx)
@@ -70,6 +74,8 @@ func main() {
 			fmt.Sprintf("worker-%d", i),
 			accrualDriver,
 			storage,
+			orderRepo,
+			accrualRepo,
 			logger,
 			jobs,
 			done,

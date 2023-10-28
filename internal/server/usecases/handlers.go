@@ -27,7 +27,7 @@ func (c *BaseController) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Commit()
-	user, err := c.stor.CreateUser(r.Context(), tx, userReq.Login, pwdhash)
+	user, err := c.userRepo.CreateUser(r.Context(), tx, userReq.Login, pwdhash)
 	if err != nil {
 		defer tx.Rollback()
 		if errors.Is(err, entities.ErrLoginAlreadyTaken) {
@@ -39,7 +39,7 @@ func (c *BaseController) register(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	session, err := c.stor.CreateSession(r.Context(), tx, user, token)
+	session, err := c.userRepo.CreateSession(r.Context(), tx, user, token)
 	if err != nil {
 		defer tx.Rollback()
 		w.WriteHeader(http.StatusInternalServerError)
@@ -54,7 +54,7 @@ func (c *BaseController) signIn(w http.ResponseWriter, r *http.Request) {
 	if userReq == nil {
 		return
 	}
-	user, err := c.stor.FindUser(r.Context(), userReq)
+	user, err := c.userRepo.FindUser(r.Context(), userReq)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to find the user"))
@@ -79,7 +79,7 @@ func (c *BaseController) signIn(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Failed to create a user session"))
 		return
 	}
-	session, err := c.stor.CreateSession(r.Context(), tx, user, token)
+	session, err := c.userRepo.CreateSession(r.Context(), tx, user, token)
 	if err != nil {
 		defer tx.Rollback()
 		w.WriteHeader(http.StatusInternalServerError)
@@ -98,7 +98,7 @@ func (c *BaseController) createOrder(w http.ResponseWriter, r *http.Request) {
 	if number == nil {
 		return
 	}
-	order, existed, err := c.stor.CreateOrder(r.Context(), *userID, *number)
+	order, existed, err := c.orderRepo.CreateOrder(r.Context(), *userID, *number)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to create an order"))
@@ -122,7 +122,7 @@ func (c *BaseController) getOrders(w http.ResponseWriter, r *http.Request) {
 	if userID == nil {
 		return
 	}
-	orders, err := c.stor.FindUserOrders(r.Context(), *userID)
+	orders, err := c.orderRepo.FindUserOrders(r.Context(), *userID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to find user's orders"))
@@ -147,7 +147,7 @@ func (c *BaseController) getBalance(w http.ResponseWriter, r *http.Request) {
 	if userID == nil {
 		return
 	}
-	result, err := c.stor.GetBalance(r.Context(), *userID)
+	result, err := c.accrualRepo.GetBalance(r.Context(), *userID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to read user balance"))
@@ -172,7 +172,7 @@ func (c *BaseController) withdraw(w http.ResponseWriter, r *http.Request) {
 	if withdrawal == nil {
 		return
 	}
-	balance, err := c.stor.GetBalance(r.Context(), *userID)
+	balance, err := c.accrualRepo.GetBalance(r.Context(), *userID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("failed to check user balance"))
@@ -183,7 +183,7 @@ func (c *BaseController) withdraw(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("insufficient funds"))
 		return
 	}
-	if _, err := c.stor.CreateWithdrawal(r.Context(), withdrawal); err != nil {
+	if _, err := c.accrualRepo.CreateWithdrawal(r.Context(), withdrawal); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("failed to create withdrawal"))
 		return
@@ -195,7 +195,7 @@ func (c *BaseController) getWithdrawals(w http.ResponseWriter, r *http.Request) 
 	if userID == nil {
 		return
 	}
-	withdrawals, err := c.stor.FindUserWithdrawals(r.Context(), *userID)
+	withdrawals, err := c.accrualRepo.FindUserWithdrawals(r.Context(), *userID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to find user's withdrawals"))

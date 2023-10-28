@@ -9,7 +9,7 @@ import (
 	"github.com/matthiasBT/gophermart/internal/server/entities"
 )
 
-func Middleware(logger logging.ILogger, storage entities.Storage) func(next http.Handler) http.Handler {
+func Middleware(logger logging.ILogger, userRepo entities.UserRepo) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		checkAuthFn := func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == "POST" && (r.URL.Path == "/api/user/register" || r.URL.Path == "/api/user/login") {
@@ -23,7 +23,7 @@ func Middleware(logger logging.ILogger, storage entities.Storage) func(next http
 				w.Write([]byte("Missing session cookie"))
 				return
 			}
-			session, err := storage.FindSession(r.Context(), cookie.Value)
+			session, err := userRepo.FindSession(r.Context(), cookie.Value)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Write([]byte("Failed to find a session"))
